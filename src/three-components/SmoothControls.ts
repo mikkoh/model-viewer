@@ -15,7 +15,7 @@
 
 import {Camera, EventDispatcher, Quaternion, Spherical, Vector2, Vector3} from 'three';
 
-import {clamp, step} from '../utils.js';
+import {clamp, step} from '../utilities';
 
 export type EventHandlingBehavior = 'prevent-all'|'prevent-handled';
 export type InteractionPolicy = 'always-allow'|'allow-when-focused';
@@ -90,6 +90,8 @@ const $touchMode = Symbol('touchMode');
 const $previousPosition = Symbol('previousPosition');
 const $canInteract = Symbol('canInteract');
 const $interactionEnabled = Symbol('interactionEnabled');
+const $userAdjustOrbit = Symbol('userAdjustOrbit');
+const $isUserChange = Symbol('isUserChange');
 
 // Pointer state
 const $pointerIsDown = Symbol('pointerIsDown');
@@ -164,6 +166,7 @@ export class SmoothControls extends EventDispatcher {
   private[$spherical]: Spherical = new Spherical();
   private[$targetSpherical]: Spherical = new Spherical();
   private[$previousPosition]: Vector3 = new Vector3();
+  private[$isUserChange]: boolean = false;
 
   private[$pointerIsDown]: boolean = false;
   private[$lastPointerPosition]: Vector2 = new Vector2();
@@ -341,7 +344,7 @@ export class SmoothControls extends EventDispatcher {
     const targetTheta = theta - deltaTheta;
     const targetPhi = phi - deltaPhi;
     const targetRadius = radius + deltaRadius;
-
+    
     return this.setOrbit(targetTheta, targetPhi, targetRadius);
   }
 
@@ -409,7 +412,12 @@ export class SmoothControls extends EventDispatcher {
     // the spherical->position derivation:
     if (!this[$previousPosition].equals(this.camera.position)) {
       this[$previousPosition].copy(this.camera.position);
-      this.dispatchEvent({type: 'change'});
+
+      const source = this[$isUserChange] ? 'user-interaction' : '';
+
+      this.dispatchEvent({type: 'change', source});
+
+      this[$isUserChange] = false;
     } else {
       this[$targetSpherical].copy(this[$spherical]);
     }
@@ -428,6 +436,14 @@ export class SmoothControls extends EventDispatcher {
     return MINIMUM_DAMPENING_FACTOR -
         this[$options].dampeningScale! *
         (MINIMUM_DAMPENING_FACTOR - MAXIMUM_DAMPENING_FACTOR)
+  }
+
+  private[$userAdjustOrbit](deltaTheta: number, deltaPhi: number, deltaRadius: number): boolean {
+    const handled = this.adjustOrbit(deltaTheta, deltaPhi, deltaRadius);
+
+    this[$isUserChange] = this[$isUserChange] || handled;
+
+    return handled;
   }
 
   private[$pixelLengthToSphericalAngle](pixelLength: number): number {
@@ -478,7 +494,7 @@ export class SmoothControls extends EventDispatcher {
                 this[$twoTouchDistance](touches[0], touches[1]);
             const radiusDelta = -1 * (touchDistance - lastTouchDistance) / 10.0;
 
-            handled = this.adjustOrbit(0, 0, radiusDelta);
+            handled = this[$userAdjustOrbit](0, 0, radiusDelta);
           }
 
           break;
@@ -489,7 +505,7 @@ export class SmoothControls extends EventDispatcher {
           const deltaTheta = this[$pixelLengthToSphericalAngle](xTwo - xOne);
           const deltaPhi = this[$pixelLengthToSphericalAngle](yTwo - yOne);
 
-          handled = this.adjustOrbit(deltaTheta, deltaPhi, 0)
+          handled = this[$userAdjustOrbit](deltaTheta, deltaPhi, 0)
 
           break;
       }
@@ -503,7 +519,7 @@ export class SmoothControls extends EventDispatcher {
       const deltaPhi =
           this[$pixelLengthToSphericalAngle](y - this[$lastPointerPosition].y);
 
-      handled = this.adjustOrbit(deltaTheta, deltaPhi, 0.0);
+      handled = this[$userAdjustOrbit](deltaTheta, deltaPhi, 0.0);
 
       this[$lastPointerPosition].set(x, y);
     }
@@ -550,7 +566,7 @@ export class SmoothControls extends EventDispatcher {
 
     const deltaRadius = (event as WheelEvent).deltaY / 10.0;
 
-    if ((this.adjustOrbit(0, 0, deltaRadius) ||
+    if ((this[$userAdjustOrbit](0, 0, deltaRadius) ||
          this[$options].eventHandlingBehavior === 'prevent-all') &&
         event.cancelable) {
       event.preventDefault();
@@ -567,27 +583,27 @@ export class SmoothControls extends EventDispatcher {
     switch (event.keyCode) {
       case KeyCode.PAGE_UP:
         relevantKey = true;
-        handled = this.adjustOrbit(0, 0, 1);
+        handled = this[$userAdjustOrbit](0, 0, 1);
         break;
       case KeyCode.PAGE_DOWN:
         relevantKey = true;
-        handled = this.adjustOrbit(0, 0, -1);
+        handled = this[$userAdjustOrbit](0, 0, -1);
         break;
       case KeyCode.UP:
         relevantKey = true;
-        handled = this.adjustOrbit(0, -KEYBOARD_ORBIT_INCREMENT, 0);
+        handled = this[$userAdjustOrbit](0, -KEYBOARD_ORBIT_INCREMENT, 0);
         break;
       case KeyCode.DOWN:
         relevantKey = true;
-        handled = this.adjustOrbit(0, KEYBOARD_ORBIT_INCREMENT, 0);
+        handled = this[$userAdjustOrbit](0, KEYBOARD_ORBIT_INCREMENT, 0);
         break;
       case KeyCode.LEFT:
         relevantKey = true;
-        handled = this.adjustOrbit(-KEYBOARD_ORBIT_INCREMENT, 0, 0);
+        handled = this[$userAdjustOrbit](-KEYBOARD_ORBIT_INCREMENT, 0, 0);
         break;
       case KeyCode.RIGHT:
         relevantKey = true;
-        handled = this.adjustOrbit(KEYBOARD_ORBIT_INCREMENT, 0, 0);
+        handled = this[$userAdjustOrbit](KEYBOARD_ORBIT_INCREMENT, 0, 0);
         break;
     }
 

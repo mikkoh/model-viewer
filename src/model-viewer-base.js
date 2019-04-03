@@ -19,7 +19,7 @@ import {HAS_INTERSECTION_OBSERVER, HAS_RESIZE_OBSERVER} from './constants.js';
 import {makeTemplate} from './template.js';
 import ModelScene from './three-components/ModelScene.js';
 import Renderer from './three-components/Renderer.js';
-import {debounce, deserializeUrl} from './utils.js';
+import {debounce, deserializeUrl} from './utilities';
 
 let renderer = new Renderer();
 
@@ -41,6 +41,7 @@ export const $needsRender = Symbol('needsRender');
 export const $tick = Symbol('tick');
 export const $onModelLoad = Symbol('onModelLoad');
 export const $onResize = Symbol('onResize');
+export const $onUserModelOrbit = Symbol('onUserModelOrbit');
 export const $renderer = Symbol('renderer');
 export const $resetRenderer = Symbol('resetRenderer');
 
@@ -263,6 +264,8 @@ export default class ModelViewerElementBase extends UpdatingElement {
     this[$scene].setSize(e.width, e.height);
     this[$needsRender]();
   }
+
+  [$onUserModelOrbit]() {}
 
   /**
    * Parses the element for an appropriate source URL and

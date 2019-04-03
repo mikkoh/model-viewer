@@ -16,7 +16,7 @@
 import {PerspectiveCamera, Spherical, Vector3} from 'three';
 
 import {DEFAULT_OPTIONS, KeyCode, SmoothControls} from '../../three-components/SmoothControls.js';
-import {step} from '../../utils.js';
+import {step} from '../../utilities';
 import {dispatchSyntheticEvent} from '../helpers.js';
 
 const expect = chai.expect;
@@ -320,6 +320,41 @@ suite('SmoothControls', () => {
                 .to.be.greaterThan(DEFAULT_OPTIONS.minimumRadius);
           });
         });
+
+        suite('events', () => {
+          test('dispatches "change" on user interaction', () => {
+            let didCall = false;
+            let changeSource;
+
+            controls.addEventListener('change', ({source}) => {
+              didCall = true;
+              changeSource = source;
+            });
+
+            dispatchSyntheticEvent(element, 'keydown', {keyCode: KeyCode.UP});
+            settleControls(controls);
+
+            expect(didCall).to.be.true;
+            expect(changeSource).to.equal('user-interaction');
+          });
+
+          test('dispatches "change" on direct orbit change', () => {
+            let didCall = false;
+            let changeSource;
+
+            controls.addEventListener('change', ({source}) => {
+              didCall = true;
+              changeSource = source;
+            });
+
+            controls.setOrbit(33, 33, 33);
+            settleControls(controls);
+
+            expect(didCall).to.be.true;
+            expect(changeSource).to.equal('');
+          });
+        });
+
       });
     });
   });
