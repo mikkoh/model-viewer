@@ -30,6 +30,8 @@ const $loaded = Symbol('loaded');
 const $template = Symbol('template');
 const $fallbackResizeHandler = Symbol('fallbackResizeHandler');
 const $defaultAriaLabel = Symbol('defaultAriaLabel');
+const $gltfSrc = Symbol('gltfSrc');
+const $sourceSlot = Symbol('sourceSlot');
 
 export const $ariaLabel = Symbol('ariaLabel');
 export const $updateSource = Symbol('updateSource');
@@ -51,7 +53,8 @@ export const $resetRenderer = Symbol('resetRenderer');
 export default class ModelViewerElementBase extends UpdatingElement {
   static get properties() {
     return {
-      alt: {type: String}, src: {converter: {fromAttribute: deserializeUrl}}
+      alt: {type: String},
+      src: {converter: {fromAttribute: deserializeUrl}}
     }
   }
 
@@ -74,6 +77,14 @@ export default class ModelViewerElementBase extends UpdatingElement {
 
   get loaded() {
     return this[$loaded];
+  }
+
+  get[$gltfSrc]() {
+    return this.getSource('glb', 'gltf') || this.src || null;
+  }
+
+  get[$sourceSlot]() {
+    return this.shadowRoot.querySelector('slot:not([name])');
   }
 
   get[$renderer]() {
@@ -164,6 +175,31 @@ export default class ModelViewerElementBase extends UpdatingElement {
     }
   }
 
+  getSource(types) {
+    const sourceElements = this[$sourceSlot]
+      .assignedNodes()
+      .filter(({nodeName}) => {
+        return nodeName === 'SOURCE';
+      });
+
+    let url = null;
+    
+    for (let extension of types) {
+      const matchingNode = sourceElements.find(({src}) => {
+        const extensionRegex = new RegExp(`.${extension}$`, 'i');
+        return extensionRegex.test(src);
+      });
+
+      url = matchingNode ? matchingNode.src : null;
+
+      if (url) {
+        break;
+      }
+    }
+
+    return url;
+  }
+
   connectedCallback() {
     super.connectedCallback && super.connectedCallback();
     if (HAS_RESIZE_OBSERVER) {
@@ -178,6 +214,10 @@ export default class ModelViewerElementBase extends UpdatingElement {
 
     this[$renderer].registerScene(this[$scene]);
     this[$scene].isDirty = true;
+
+    this[$sourceSlot].addEventListener('slotchange', () => {
+      this[$updateSource]();
+    });
   }
 
   disconnectedCallback() {
@@ -197,13 +237,16 @@ export default class ModelViewerElementBase extends UpdatingElement {
 
   updated(changedProperties) {
     super.updated(changedProperties);
+    
+    if (changedProperties.size === 0) {
+      return;
+    }
 
     // NOTE(cdata): If a property changes from values A -> B -> A in the space
     // of a microtask, LitElement/UpdatingElement will notify of a change even
     // though the value has effectively not changed, so we need to check to make
     // sure that the value has actually changed before changing the loaded flag.
-    if (changedProperties.has('src') && this.src !== this[$scene].model.url) {
-      this[$loaded] = false;
+    if (changedProperties.has('src')) {
       this[$updateSource]();
     }
 
@@ -266,11 +309,20 @@ export default class ModelViewerElementBase extends UpdatingElement {
    * attribute.
    */
   async[$updateSource]() {
-    const source = this.src;
+    const source = this[$gltfSrc];
+
+    if (!source) {
+      this[$canvas].classList.remove('show');
+      return;
+    }
 
     try {
       this[$canvas].classList.add('show');
-      await this[$scene].setModelSource(source);
+
+      if (source !== this[$scene].modelSource) {
+        this[$loaded] = false;
+        await this[$scene].setModelSource(source);
+      }
     } catch (error) {
       this[$canvas].classList.remove('show');
       this.dispatchEvent(new CustomEvent('error', {detail: error}));

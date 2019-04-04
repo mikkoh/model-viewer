@@ -31,6 +31,7 @@ const $shouldAttemptPreload = Symbol('shouldAttemptPreload');
 const $ensurePreloaded = Symbol('ensurePreloaded');
 const $preloadAnnounced = Symbol('preloadAnnounced');
 const $ariaLabelCallToAction = Symbol('ariaLabelCallToAction');
+const $gltfSrc = Symbol('gltfSrc');
 
 const $clickHandler = Symbol('clickHandler');
 const $keydownHandler = Symbol('keydownHandler');
@@ -57,8 +58,11 @@ export const LoadingMixin = (ModelViewerElement) => {
     }
 
     get loaded() {
-      return super.loaded ||
-          (this.src && CachingGLTFLoader.hasFinishedLoading(this.src));
+      return super.loaded || (this[$gltfSrc] && CachingGLTFLoader.hasFinishedLoading(this[$gltfSrc]));
+    }
+
+    get[$gltfSrc]() {
+      return this.getSource('glb', 'gltf') || this.src;
     }
 
     constructor() {
@@ -177,12 +181,12 @@ export const LoadingMixin = (ModelViewerElement) => {
 
     get[$shouldDismissPoster]() {
       return !this.poster ||
-          (CachingGLTFLoader.hasFinishedLoading(this.src) &&
+          (CachingGLTFLoader.hasFinishedLoading(this[$gltfSrc]) &&
            (this.revealWhenLoaded || this[$userDismissedPoster]));
     }
 
     get[$shouldAttemptPreload]() {
-      return (this[$userDismissedPoster] || this.preload) && this.src &&
+      return (this[$userDismissedPoster] || this.preload) && this[$gltfSrc] &&
           !this[$preloadAnnounced];
     }
 
@@ -218,10 +222,10 @@ export const LoadingMixin = (ModelViewerElement) => {
     }
 
     async[$ensurePreloaded]() {
-      const preloaded = CachingGLTFLoader.hasFinishedLoading(this.src);
+      const preloaded = CachingGLTFLoader.hasFinishedLoading(this[$gltfSrc]);
 
       if (this[$shouldAttemptPreload]) {
-        const detail = {url: this.src};
+        const detail = {url: this[$gltfSrc]};
 
         this[$preloadAnnounced] = true;
 
@@ -229,7 +233,7 @@ export const LoadingMixin = (ModelViewerElement) => {
           this.dispatchEvent(new CustomEvent('preload', {detail}));
         } else {
           try {
-            await loader.preload(this.src);
+            await loader.preload(this[$gltfSrc]);
 
             this.dispatchEvent(new CustomEvent('preload', {detail}));
             this.requestUpdate();

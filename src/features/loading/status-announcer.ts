@@ -95,8 +95,9 @@ export class LoadingStatusAnnouncer extends EventDispatcher {
     }
 
     let onUnregistered = () => {};
+    const src = (modelViewer as any).getSource('glb', 'gltf') || (modelViewer as any).src;
     const loadShouldBeMeasured =
-        modelViewer.loaded === false && !!(modelViewer as any).src;
+        modelViewer.loaded === false && !!src;
     const loadAttemptCompletes = new Promise((resolve) => {
       if (!loadShouldBeMeasured) {
         resolve();
