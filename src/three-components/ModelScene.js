@@ -62,7 +62,6 @@ const FOV = 45;
 const $paused = Symbol('paused');
 const $modelAlignmentMask = Symbol('modelAlignmentMask');
 const $idealCameraDistance = Symbol('idealCameraDistance');
-const $modelSource = Symbol('modelSource');
 
 /**
  * A THREE.Scene object that takes a Model and CanvasHTMLElement and
@@ -96,7 +95,6 @@ export default class ModelScene extends Scene {
 
     this.unscaledModelOffset = new Vector3(0, 0, 0);
 
-    this[$modelSource] = null;
     this.model = new Model();
     this.shadow = new StaticShadow();
     this.light = new AmbientLight(0xffffff, AMBIENT_LIGHT_HIGH_INTENSITY);
@@ -151,10 +149,6 @@ export default class ModelScene extends Scene {
     this[$paused] = false;
   }
 
-  get modelSource() {
-    return this[$modelSource];
-  }
-
   /**
    * Sets the model via URL.
    *
@@ -162,7 +156,6 @@ export default class ModelScene extends Scene {
    */
   async setModelSource(source) {
     try {
-      this[$modelSource] = source;
       await this.model.setSource(source);
     } catch (e) {
       throw new Error(
