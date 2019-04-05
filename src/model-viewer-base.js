@@ -20,6 +20,7 @@ import {makeTemplate} from './template.js';
 import ModelScene from './three-components/ModelScene.js';
 import Renderer from './three-components/Renderer.js';
 import {debounce, deserializeUrl} from './utils.js';
+import getSrc from './utils/get-src';
 
 let renderer = new Renderer();
 
@@ -30,8 +31,12 @@ const $loaded = Symbol('loaded');
 const $template = Symbol('template');
 const $fallbackResizeHandler = Symbol('fallbackResizeHandler');
 const $defaultAriaLabel = Symbol('defaultAriaLabel');
+const $sourceSlot = Symbol('sourceSlot');
+const $checkSourceChange = Symbol('checkSourceChange');
 
 export const $ariaLabel = Symbol('ariaLabel');
+export const $gltfSrc = Symbol('gltfSrc');
+export const $sourceChanged = Symbol('sourceChanged');
 export const $updateSource = Symbol('updateSource');
 export const $markLoaded = Symbol('markLoaded');
 export const $container = Symbol('container');
@@ -51,7 +56,8 @@ export const $resetRenderer = Symbol('resetRenderer');
 export default class ModelViewerElementBase extends UpdatingElement {
   static get properties() {
     return {
-      alt: {type: String}, src: {converter: {fromAttribute: deserializeUrl}}
+      alt: {type: String},
+      src: {converter: {fromAttribute: deserializeUrl}}
     }
   }
 
@@ -74,6 +80,10 @@ export default class ModelViewerElementBase extends UpdatingElement {
 
   get loaded() {
     return this[$loaded];
+  }
+
+  get[$sourceSlot]() {
+    return this.shadowRoot.querySelector('slot:not([name])');
   }
 
   get[$renderer]() {
@@ -105,6 +115,7 @@ export default class ModelViewerElementBase extends UpdatingElement {
     this[$scene] = new ModelScene(
         {canvas: this[$canvas], element: this, width, height, renderer});
 
+    this[$gltfSrc] = null;
     this[$loaded] = false;
 
     this[$scene].addEventListener('model-load', (event) => {
@@ -164,6 +175,16 @@ export default class ModelViewerElementBase extends UpdatingElement {
     }
   }
 
+  getSource(types, srcAttribute = null) {
+    const sourceElements = this[$sourceSlot]
+      .assignedNodes()
+      .filter(({nodeName}) => {
+        return nodeName === 'SOURCE';
+      });
+
+    return getSrc(types, sourceElements, srcAttribute);
+  }
+
   connectedCallback() {
     super.connectedCallback && super.connectedCallback();
     if (HAS_RESIZE_OBSERVER) {
@@ -178,6 +199,10 @@ export default class ModelViewerElementBase extends UpdatingElement {
 
     this[$renderer].registerScene(this[$scene]);
     this[$scene].isDirty = true;
+
+    this[$sourceSlot].addEventListener('slotchange', () => {
+      this[$checkSourceChange]();
+    });
   }
 
   disconnectedCallback() {
@@ -197,14 +222,17 @@ export default class ModelViewerElementBase extends UpdatingElement {
 
   updated(changedProperties) {
     super.updated(changedProperties);
+    
+    if (changedProperties.size === 0) {
+      return;
+    }
 
     // NOTE(cdata): If a property changes from values A -> B -> A in the space
     // of a microtask, LitElement/UpdatingElement will notify of a change even
     // though the value has effectively not changed, so we need to check to make
     // sure that the value has actually changed before changing the loaded flag.
-    if (changedProperties.has('src') && this.src !== this[$scene].model.url) {
-      this[$loaded] = false;
-      this[$updateSource]();
+    if (changedProperties.has('src')) {
+      this[$checkSourceChange]();
     }
 
     if (changedProperties.has('alt')) {
@@ -260,17 +288,41 @@ export default class ModelViewerElementBase extends UpdatingElement {
     this[$needsRender]();
   }
 
+  [$checkSourceChange]() {
+    const gltfSrc = this.getSource(['glb', 'gltf'], this.src);
+
+    if (this[$gltfSrc] === gltfSrc) {
+      return;
+    }
+
+    this[$gltfSrc] = gltfSrc;
+
+    this[$sourceChanged]();
+  }
+
+  [$sourceChanged]() {
+    this[$updateSource]();
+  }
+
   /**
    * Parses the element for an appropriate source URL and
    * sets the views to use the new model based off of the `preload`
    * attribute.
    */
   async[$updateSource]() {
-    const source = this.src;
+    const source = this[$gltfSrc];
+
+    if (!source) {
+      this[$canvas].classList.remove('show');
+      return;
+    }
 
     try {
-      this[$canvas].classList.add('show');
-      await this[$scene].setModelSource(source);
+      if (source !== this[$scene].modelSource) {
+        this[$loaded] = false;
+        await this[$scene].setModelSource(source);
+        this[$canvas].classList.add('show');
+      }
     } catch (error) {
       this[$canvas].classList.remove('show');
       this.dispatchEvent(new CustomEvent('error', {detail: error}));

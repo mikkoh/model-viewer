@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-import {$ariaLabel, $canvas, $updateSource} from '../model-viewer-base.js';
+import {$ariaLabel, $canvas, $sourceChanged, $updateSource, $gltfSrc} from '../model-viewer-base.js';
 import {CachingGLTFLoader} from '../three-components/CachingGLTFLoader.js';
 import {debounce, deserializeUrl} from '../utils.js';
 import {LoadingStatusAnnouncer} from './loading/status-announcer.js';
@@ -57,8 +57,7 @@ export const LoadingMixin = (ModelViewerElement) => {
     }
 
     get loaded() {
-      return super.loaded ||
-          (this.src && CachingGLTFLoader.hasFinishedLoading(this.src));
+      return super.loaded || (this[$gltfSrc] && CachingGLTFLoader.hasFinishedLoading(this[$gltfSrc]));
     }
 
     constructor() {
@@ -177,12 +176,12 @@ export const LoadingMixin = (ModelViewerElement) => {
 
     get[$shouldDismissPoster]() {
       return !this.poster ||
-          (CachingGLTFLoader.hasFinishedLoading(this.src) &&
+          (CachingGLTFLoader.hasFinishedLoading(this[$gltfSrc]) &&
            (this.revealWhenLoaded || this[$userDismissedPoster]));
     }
 
     get[$shouldAttemptPreload]() {
-      return (this[$userDismissedPoster] || this.preload) && this.src &&
+      return (this[$userDismissedPoster] || this.preload) && this[$gltfSrc] &&
           !this[$preloadAnnounced];
     }
 
@@ -201,10 +200,6 @@ export const LoadingMixin = (ModelViewerElement) => {
         posterElement.style.backgroundImage = `url("${this.poster}")`;
       }
 
-      if (changedProperties.has('src')) {
-        this[$preloadAnnounced] = false;
-      }
-
       this[$ensurePreloaded]();
 
       if (this[$shouldDismissPoster]) {
@@ -218,10 +213,10 @@ export const LoadingMixin = (ModelViewerElement) => {
     }
 
     async[$ensurePreloaded]() {
-      const preloaded = CachingGLTFLoader.hasFinishedLoading(this.src);
+      const preloaded = CachingGLTFLoader.hasFinishedLoading(this[$gltfSrc]);
 
       if (this[$shouldAttemptPreload]) {
-        const detail = {url: this.src};
+        const detail = {url: this[$gltfSrc]};
 
         this[$preloadAnnounced] = true;
 
@@ -229,7 +224,7 @@ export const LoadingMixin = (ModelViewerElement) => {
           this.dispatchEvent(new CustomEvent('preload', {detail}));
         } else {
           try {
-            await loader.preload(this.src);
+            await loader.preload(this[$gltfSrc]);
 
             this.dispatchEvent(new CustomEvent('preload', {detail}));
             this.requestUpdate();
@@ -239,6 +234,12 @@ export const LoadingMixin = (ModelViewerElement) => {
           }
         }
       }
+    }
+
+    [$sourceChanged]() {
+      super[$sourceChanged]();
+
+      this[$preloadAnnounced] = false;
     }
 
     async[$updateSource]() {
