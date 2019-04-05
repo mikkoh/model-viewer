@@ -20,6 +20,7 @@ import {makeTemplate} from './template.js';
 import ModelScene from './three-components/ModelScene.js';
 import Renderer from './three-components/Renderer.js';
 import {debounce, deserializeUrl} from './utils.js';
+import getSrc from './utils/get-src';
 
 let renderer = new Renderer();
 
@@ -30,10 +31,12 @@ const $loaded = Symbol('loaded');
 const $template = Symbol('template');
 const $fallbackResizeHandler = Symbol('fallbackResizeHandler');
 const $defaultAriaLabel = Symbol('defaultAriaLabel');
-const $gltfSrc = Symbol('gltfSrc');
 const $sourceSlot = Symbol('sourceSlot');
+const $checkSourceChange = Symbol('checkSourceChange');
 
 export const $ariaLabel = Symbol('ariaLabel');
+export const $gltfSrc = Symbol('gltfSrc');
+export const $sourceChanged = Symbol('sourceChanged');
 export const $updateSource = Symbol('updateSource');
 export const $markLoaded = Symbol('markLoaded');
 export const $container = Symbol('container');
@@ -79,10 +82,6 @@ export default class ModelViewerElementBase extends UpdatingElement {
     return this[$loaded];
   }
 
-  get[$gltfSrc]() {
-    return this.getSource('glb', 'gltf') || this.src || null;
-  }
-
   get[$sourceSlot]() {
     return this.shadowRoot.querySelector('slot:not([name])');
   }
@@ -116,6 +115,7 @@ export default class ModelViewerElementBase extends UpdatingElement {
     this[$scene] = new ModelScene(
         {canvas: this[$canvas], element: this, width, height, renderer});
 
+    this[$gltfSrc] = null;
     this[$loaded] = false;
 
     this[$scene].addEventListener('model-load', (event) => {
@@ -175,29 +175,14 @@ export default class ModelViewerElementBase extends UpdatingElement {
     }
   }
 
-  getSource(types) {
+  getSource(types, srcAttribute = null) {
     const sourceElements = this[$sourceSlot]
       .assignedNodes()
       .filter(({nodeName}) => {
         return nodeName === 'SOURCE';
       });
 
-    let url = null;
-    
-    for (let extension of types) {
-      const matchingNode = sourceElements.find(({src}) => {
-        const extensionRegex = new RegExp(`.${extension}$`, 'i');
-        return extensionRegex.test(src);
-      });
-
-      url = matchingNode ? matchingNode.src : null;
-
-      if (url) {
-        break;
-      }
-    }
-
-    return url;
+    return getSrc(types, sourceElements, srcAttribute);
   }
 
   connectedCallback() {
@@ -216,7 +201,7 @@ export default class ModelViewerElementBase extends UpdatingElement {
     this[$scene].isDirty = true;
 
     this[$sourceSlot].addEventListener('slotchange', () => {
-      this[$updateSource]();
+      this[$checkSourceChange]();
     });
   }
 
@@ -247,7 +232,7 @@ export default class ModelViewerElementBase extends UpdatingElement {
     // though the value has effectively not changed, so we need to check to make
     // sure that the value has actually changed before changing the loaded flag.
     if (changedProperties.has('src')) {
-      this[$updateSource]();
+      this[$checkSourceChange]();
     }
 
     if (changedProperties.has('alt')) {
@@ -303,6 +288,22 @@ export default class ModelViewerElementBase extends UpdatingElement {
     this[$needsRender]();
   }
 
+  [$checkSourceChange]() {
+    const gltfSrc = this.getSource(['glb', 'gltf'], this.src);
+
+    if (this[$gltfSrc] === gltfSrc) {
+      return;
+    }
+
+    this[$gltfSrc] = gltfSrc;
+
+    this[$sourceChanged]();
+  }
+
+  [$sourceChanged]() {
+    this[$updateSource]();
+  }
+
   /**
    * Parses the element for an appropriate source URL and
    * sets the views to use the new model based off of the `preload`
@@ -317,11 +318,10 @@ export default class ModelViewerElementBase extends UpdatingElement {
     }
 
     try {
-      this[$canvas].classList.add('show');
-
       if (source !== this[$scene].modelSource) {
         this[$loaded] = false;
         await this[$scene].setModelSource(source);
+        this[$canvas].classList.add('show');
       }
     } catch (error) {
       this[$canvas].classList.remove('show');

@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-import {$ariaLabel, $canvas, $updateSource} from '../model-viewer-base.js';
+import {$ariaLabel, $canvas, $sourceChanged, $updateSource, $gltfSrc} from '../model-viewer-base.js';
 import {CachingGLTFLoader} from '../three-components/CachingGLTFLoader.js';
 import {debounce, deserializeUrl} from '../utils.js';
 import {LoadingStatusAnnouncer} from './loading/status-announcer.js';
@@ -31,7 +31,6 @@ const $shouldAttemptPreload = Symbol('shouldAttemptPreload');
 const $ensurePreloaded = Symbol('ensurePreloaded');
 const $preloadAnnounced = Symbol('preloadAnnounced');
 const $ariaLabelCallToAction = Symbol('ariaLabelCallToAction');
-const $gltfSrc = Symbol('gltfSrc');
 
 const $clickHandler = Symbol('clickHandler');
 const $keydownHandler = Symbol('keydownHandler');
@@ -59,10 +58,6 @@ export const LoadingMixin = (ModelViewerElement) => {
 
     get loaded() {
       return super.loaded || (this[$gltfSrc] && CachingGLTFLoader.hasFinishedLoading(this[$gltfSrc]));
-    }
-
-    get[$gltfSrc]() {
-      return this.getSource('glb', 'gltf') || this.src;
     }
 
     constructor() {
@@ -205,10 +200,6 @@ export const LoadingMixin = (ModelViewerElement) => {
         posterElement.style.backgroundImage = `url("${this.poster}")`;
       }
 
-      if (changedProperties.has('src')) {
-        this[$preloadAnnounced] = false;
-      }
-
       this[$ensurePreloaded]();
 
       if (this[$shouldDismissPoster]) {
@@ -243,6 +234,12 @@ export const LoadingMixin = (ModelViewerElement) => {
           }
         }
       }
+    }
+
+    [$sourceChanged]() {
+      super[$sourceChanged]();
+
+      this[$preloadAnnounced] = false;
     }
 
     async[$updateSource]() {

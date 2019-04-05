@@ -19,7 +19,6 @@ const $showMlModel = Symbol('showMlModel');
 const $hideMlModel = Symbol('hideMlModel');
 const $isHeliosBrowser = Symbol('isHeliosBrowser');
 const $mlModel = Symbol('mlModel');
-const $gltfSrc = Symbol('gltfSrc');
 
 
 // NOTE(cdata): In tests, this seemed to line the hologram up with the scale of
@@ -45,10 +44,6 @@ export const MagicLeapMixin = (ModelViewerElement) => {
         ...super.properties,
         magicLeap: {type: Boolean, attribute: 'magic-leap'}
       };
-    }
-
-    get[$gltfSrc]() {
-      return this.getSource('glb', 'gltf') || this.src;
     }
 
     constructor() {
@@ -85,9 +80,9 @@ export const MagicLeapMixin = (ModelViewerElement) => {
         this[$container].setAttribute('style', 'display: none;');
         this[$showMlModel]();
 
-        if (changedProperties.has('src') && this[$gltfSrc] &&
-            this[$gltfSrc] !== this[$mlModel].getAttribute('src')) {
-          this[$mlModel].setAttribute('src', this[$gltfSrc]);
+        if (changedProperties.has('src') && this.src &&
+            this.src !== this[$mlModel].getAttribute('src')) {
+          this[$mlModel].setAttribute('src', this.src);
         }
 
       } else {
@@ -116,8 +111,8 @@ export const MagicLeapMixin = (ModelViewerElement) => {
         this[$mlModel].setAttribute(
             'environment-lighting', 'color-intensity: 2;');
 
-        if (this[$gltfSrc]) {
-          this[$mlModel].setAttribute('src', this[$gltfSrc]);
+        if (this.src != null) {
+          this[$mlModel].setAttribute('src', this.src);
         }
       }
 
