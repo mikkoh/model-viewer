@@ -17,7 +17,7 @@
 import {property} from 'lit-element';
 
 import ModelViewerElementBase, {$needsRender, $scene, $tick, $onUserModelOrbit} from '../model-viewer-base.js';
-import {Constructor, Timer} from '../utilities';
+import {Constructor, Timer} from '../utilities.js';
 
 const Alignment = {
   CENTER: 'center',

@@ -15,7 +15,7 @@
 
 import {$ariaLabel, $canvas, $updateSource} from '../model-viewer-base.js';
 import {CachingGLTFLoader} from '../three-components/CachingGLTFLoader.js';
-import {debounce, deserializeUrl} from '../utilities';
+import {debounce, deserializeUrl} from '../utilities.js';
 import {LoadingStatusAnnouncer} from './loading/status-announcer.js';
 
 export const $posterElement = Symbol('posterElement');

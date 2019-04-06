@@ -20,7 +20,7 @@ import {deserializeSpherical} from '../conversions.js';
 import ModelViewerElementBase, {$ariaLabel, $needsRender, $onModelLoad, $onResize, $scene, $tick, $onUserModelOrbit} from '../model-viewer-base.js';
 import {FRAMED_HEIGHT} from '../three-components/ModelScene.js';
 import {SmoothControls} from '../three-components/SmoothControls.js';
-import {Constructor} from '../utilities';
+import {Constructor} from '../utilities.js';
 
 export interface SphericalPosition {
   theta: number;

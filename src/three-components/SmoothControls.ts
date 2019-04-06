@@ -15,7 +15,7 @@
 
 import {Camera, EventDispatcher, Quaternion, Spherical, Vector2, Vector3} from 'three';
 
-import {clamp, step} from '../utilities';
+import {clamp, step} from '../utilities.js';
 
 export type EventHandlingBehavior = 'prevent-all'|'prevent-handled';
 export type InteractionPolicy = 'always-allow'|'allow-when-focused';

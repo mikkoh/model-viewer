@@ -15,7 +15,7 @@
 
 import {Box3, BoxBufferGeometry, Mesh, Vector3} from 'three';
 
-import {CAPPED_DEVICE_PIXEL_RATIO, clamp, deserializeUrl, resolveDpr, step} from '../utilities';
+import {CAPPED_DEVICE_PIXEL_RATIO, clamp, deserializeUrl, resolveDpr, step} from '../utilities.js';
 
 import {timePasses} from './helpers.js';
 import timerSpec from './utilities/timer-spec';

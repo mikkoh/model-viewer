@@ -15,8 +15,8 @@
 
 import {IS_AR_CANDIDATE, IS_IOS, IS_AR_QUICKLOOK_CANDIDATE} from '../constants.js';
 import {$renderer, $scene} from '../model-viewer-base.js';
-import {openIOSARQuickLook} from '../utilities';
-import {deserializeUrl} from '../utilities';
+import {openIOSARQuickLook} from '../utilities.js';
+import {deserializeUrl} from '../utilities.js';
 
 const $enterARElement = Symbol('enterARElement');
 const $enterARWithQuickLook = Symbol('enterARWithQuickLook');
