@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-import {Camera, EventDispatcher, Quaternion, Spherical, Vector2, Vector3} from 'three';
+import {Camera, EventDispatcher, Quaternion, Spherical, Vector2, Vector3, Event} from 'three';
 
 import {clamp, step} from '../utilities.js';
 
@@ -120,6 +120,8 @@ const $handleWheel = Symbol('handleWheel');
 const $handleKey = Symbol('handleKey');
 
 // Constants
+const USER_INTERACTION_CHANGE_SOURCE = 'user-interaction';
+const DEFAULT_INTERACTION_CHANGE_SOURCE = 'none';
 const TOUCH_EVENT_RE = /^touch(start|end|move)$/;
 const KEYBOARD_ORBIT_INCREMENT = Math.PI / 8;
 const ORBIT_STEP_EDGE = 0.001;
@@ -137,6 +139,16 @@ export const KeyCode = {
   RIGHT: 39,
   DOWN: 40
 };
+
+/**
+ * ChangEvents are dispatched whenever the camera position or orientation has changed
+ */
+export interface ChangeEvent extends Event {
+  /**
+   * determines what was the originating reason for the change event eg user or none 
+   */
+  source: string,
+}
 
 
 /**
@@ -413,7 +425,7 @@ export class SmoothControls extends EventDispatcher {
     if (!this[$previousPosition].equals(this.camera.position)) {
       this[$previousPosition].copy(this.camera.position);
 
-      const source = this[$isUserChange] ? 'user-interaction' : '';
+      const source = this[$isUserChange] ? USER_INTERACTION_CHANGE_SOURCE : DEFAULT_INTERACTION_CHANGE_SOURCE;
 
       this.dispatchEvent({type: 'change', source});
 

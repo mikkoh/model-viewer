@@ -14,12 +14,12 @@
  */
 
 import {property} from 'lit-element';
-import {PerspectiveCamera, Spherical} from 'three';
+import {PerspectiveCamera, Spherical, Event} from 'three';
 
 import {deserializeSpherical} from '../conversions.js';
 import ModelViewerElementBase, {$ariaLabel, $needsRender, $onModelLoad, $onResize, $scene, $tick, $onUserModelOrbit} from '../model-viewer-base.js';
 import {FRAMED_HEIGHT} from '../three-components/ModelScene.js';
-import {SmoothControls} from '../three-components/SmoothControls.js';
+import {SmoothControls, ChangeEvent} from '../three-components/SmoothControls.js';
 import {Constructor} from '../utilities.js';
 
 export interface SphericalPosition {
@@ -101,7 +101,7 @@ export const ControlsMixin = (ModelViewerElement:
 
         protected[$lastSpherical]: Spherical = new Spherical();
 
-        protected[$changeHandler]: (event: any) => void = (event) => this[$onChange](event);
+        protected[$changeHandler]: (event: Event) => void = (event: Event) => this[$onChange](event as ChangeEvent);
 
         protected[$focusHandler]: () => void = () => this[$onFocus]();
         protected[$blurHandler]: () => void = () => this[$onBlur]();
@@ -363,7 +363,7 @@ export const ControlsMixin = (ModelViewerElement:
           this[$promptElement].classList.remove('visible');
         }
 
-        [$onChange]({source}: any) {
+        [$onChange]({source}: ChangeEvent) {
           this[$deferInteractionPrompt]();
           this[$updateAria]();
           this[$needsRender]();
