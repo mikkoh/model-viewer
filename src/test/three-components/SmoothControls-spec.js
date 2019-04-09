@@ -15,7 +15,7 @@
 
 import {PerspectiveCamera, Spherical, Vector3} from 'three';
 
-import {DEFAULT_OPTIONS, KeyCode, SmoothControls} from '../../three-components/SmoothControls.js';
+import {DEFAULT_OPTIONS, KeyCode, SmoothControls, $targetSpherical} from '../../three-components/SmoothControls.js';
 import {step} from '../../utilities';
 import {dispatchSyntheticEvent} from '../helpers.js';
 
@@ -399,6 +399,38 @@ suite('SmoothControls', () => {
             controls.update(performance.now, ONE_FRAME_DELTA);
 
             controls.setOrbit(3, 3, 3);
+
+            controls.update(performance.now, ONE_FRAME_DELTA);
+            controls.update(performance.now, ONE_FRAME_DELTA);
+
+            expect(changeSource.length).to.equal(5);
+            expect(changeSource).to.eql(expectedSources);
+          });
+
+          test('continues to end "user-interaction" if setOrbit is called with the same value', () => {
+            const expectedSources = [
+              USER_INTERACTION_CHANGE_SOURCE,
+              USER_INTERACTION_CHANGE_SOURCE,
+              USER_INTERACTION_CHANGE_SOURCE,
+              USER_INTERACTION_CHANGE_SOURCE,
+              USER_INTERACTION_CHANGE_SOURCE,
+            ];
+            let changeSource = [];
+
+            controls.addEventListener('change', ({source}) => {
+              changeSource.push(source);
+            });
+
+            dispatchSyntheticEvent(element, 'keydown', {keyCode: KeyCode.UP});
+            controls.update(performance.now, ONE_FRAME_DELTA);
+            controls.update(performance.now, ONE_FRAME_DELTA);
+            controls.update(performance.now, ONE_FRAME_DELTA);
+            
+            controls.setOrbit(
+              controls[$targetSpherical].theta,
+              controls[$targetSpherical].phi,
+              controls[$targetSpherical].radius,
+            );
 
             controls.update(performance.now, ONE_FRAME_DELTA);
             controls.update(performance.now, ONE_FRAME_DELTA);
