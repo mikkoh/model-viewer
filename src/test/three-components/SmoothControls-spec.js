@@ -351,7 +351,7 @@ suite('SmoothControls', () => {
             settleControls(controls);
 
             expect(didCall).to.be.true;
-            expect(changeSource).to.equal('');
+            expect(changeSource).to.equal('none');
           });
         });
 
