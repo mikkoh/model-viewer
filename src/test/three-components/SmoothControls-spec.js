@@ -28,6 +28,9 @@ const HALF_PI = Math.PI / 2.0;
 const QUARTER_PI = HALF_PI / 2.0;
 const THREE_QUARTERS_PI = HALF_PI + QUARTER_PI;
 
+const USER_INTERACTION_CHANGE_SOURCE = 'user-interaction';
+const DEFAULT_INTERACTION_CHANGE_SOURCE = 'none';
+
 // NOTE(cdata): Precision is a bit off when comparing e.g., expected camera
 // direction in practice:
 const FLOAT_EQUALITY_THRESHOLD = 1e-6;
@@ -335,7 +338,7 @@ suite('SmoothControls', () => {
             settleControls(controls);
 
             expect(didCall).to.be.true;
-            expect(changeSource).to.equal('user-interaction');
+            expect(changeSource).to.equal(USER_INTERACTION_CHANGE_SOURCE);
           });
 
           test('dispatches "change" on direct orbit change', () => {
@@ -351,7 +354,57 @@ suite('SmoothControls', () => {
             settleControls(controls);
 
             expect(didCall).to.be.true;
-            expect(changeSource).to.equal('none');
+            expect(changeSource).to.equal(DEFAULT_INTERACTION_CHANGE_SOURCE);
+          });
+
+          test('sends "user-interaction" multiple times', () => {
+            const expectedSources = [
+              USER_INTERACTION_CHANGE_SOURCE,
+              USER_INTERACTION_CHANGE_SOURCE,
+              USER_INTERACTION_CHANGE_SOURCE,
+            ];
+            let changeSource = [];
+
+            controls.addEventListener('change', ({source}) => {
+              changeSource.push(source);
+            });
+
+            dispatchSyntheticEvent(element, 'keydown', {keyCode: KeyCode.UP});
+            controls.update(performance.now, ONE_FRAME_DELTA);
+            controls.update(performance.now, ONE_FRAME_DELTA);
+            controls.update(performance.now, ONE_FRAME_DELTA);
+
+            expect(changeSource.length).to.equal(3);
+            expect(changeSource).to.eql(expectedSources);
+          });
+
+          test('does not send "user-interaction" after setOrbit', () => {
+            const expectedSources = [
+              USER_INTERACTION_CHANGE_SOURCE,
+              USER_INTERACTION_CHANGE_SOURCE,
+              USER_INTERACTION_CHANGE_SOURCE,
+              DEFAULT_INTERACTION_CHANGE_SOURCE,
+              DEFAULT_INTERACTION_CHANGE_SOURCE,
+            ];
+            let changeSource = [];
+
+            controls.addEventListener('change', ({source}) => {
+              changeSource.push(source);
+            });
+
+            dispatchSyntheticEvent(element, 'keydown', {keyCode: KeyCode.UP});
+            
+            controls.update(performance.now, ONE_FRAME_DELTA);
+            controls.update(performance.now, ONE_FRAME_DELTA);
+            controls.update(performance.now, ONE_FRAME_DELTA);
+
+            controls.setOrbit(3, 3, 3);
+
+            controls.update(performance.now, ONE_FRAME_DELTA);
+            controls.update(performance.now, ONE_FRAME_DELTA);
+
+            expect(changeSource.length).to.equal(5);
+            expect(changeSource).to.eql(expectedSources);
           });
         });
 
