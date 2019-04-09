@@ -91,7 +91,8 @@ const $previousPosition = Symbol('previousPosition');
 const $canInteract = Symbol('canInteract');
 const $interactionEnabled = Symbol('interactionEnabled');
 const $userAdjustOrbit = Symbol('userAdjustOrbit');
-const $isUserChange = Symbol('isUserChange');
+const $isUserAdjust = Symbol('isUserAdjust');
+const $userTargetSpherical = Symbol('isUserChange');
 
 // Pointer state
 const $pointerIsDown = Symbol('pointerIsDown');
@@ -150,6 +151,19 @@ export interface ChangeEvent extends Event {
   source: string,
 }
 
+/**
+ * Simply compares to sphericals to see if they are equal
+ * 
+ * @param spherical1 
+ * @param spherical2 
+ */
+function sphericalEqual(spherical1: Spherical, spherical2: Spherical): boolean {
+  return (
+    spherical1.phi === spherical2.phi &&
+    spherical2.theta === spherical2.theta &&
+    spherical1.radius === spherical2.radius
+  );
+}
 
 /**
  * SmoothControls is a Three.js helper for adding delightful pointer and
@@ -178,7 +192,8 @@ export class SmoothControls extends EventDispatcher {
   private[$spherical]: Spherical = new Spherical();
   private[$targetSpherical]: Spherical = new Spherical();
   private[$previousPosition]: Vector3 = new Vector3();
-  private[$isUserChange]: boolean = false;
+  private[$isUserAdjust]: boolean = false;
+  private[$userTargetSpherical]: Spherical = new Spherical();
 
   private[$pointerIsDown]: boolean = false;
   private[$lastPointerPosition]: Vector2 = new Vector2();
@@ -342,6 +357,10 @@ export class SmoothControls extends EventDispatcher {
     this[$targetSpherical].radius = nextRadius;
     this[$targetSpherical].makeSafe();
 
+    // this may reset isUserAdjust but if setOrbit is called via this[$userAdjustOrbit]
+    // then this will be set to true before `update` is called
+    this[$isUserAdjust] = sphericalEqual(this[$targetSpherical], this[$userTargetSpherical]);
+
     return true;
   }
 
@@ -425,11 +444,9 @@ export class SmoothControls extends EventDispatcher {
     if (!this[$previousPosition].equals(this.camera.position)) {
       this[$previousPosition].copy(this.camera.position);
 
-      const source = this[$isUserChange] ? USER_INTERACTION_CHANGE_SOURCE : DEFAULT_INTERACTION_CHANGE_SOURCE;
+      const source = this[$isUserAdjust] ? USER_INTERACTION_CHANGE_SOURCE : DEFAULT_INTERACTION_CHANGE_SOURCE;
 
       this.dispatchEvent({type: 'change', source});
-
-      this[$isUserChange] = false;
     } else {
       this[$targetSpherical].copy(this[$spherical]);
     }
@@ -453,7 +470,8 @@ export class SmoothControls extends EventDispatcher {
   private[$userAdjustOrbit](deltaTheta: number, deltaPhi: number, deltaRadius: number): boolean {
     const handled = this.adjustOrbit(deltaTheta, deltaPhi, deltaRadius);
 
-    this[$isUserChange] = this[$isUserChange] || handled;
+    this[$isUserAdjust] = true;
+    this[$userTargetSpherical].copy(this[$targetSpherical]);
 
     return handled;
   }
