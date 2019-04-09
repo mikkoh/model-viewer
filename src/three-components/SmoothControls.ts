@@ -91,7 +91,7 @@ const $previousPosition = Symbol('previousPosition');
 const $canInteract = Symbol('canInteract');
 const $interactionEnabled = Symbol('interactionEnabled');
 const $userAdjustOrbit = Symbol('userAdjustOrbit');
-const $isUserAdjust = Symbol('isUserAdjust');
+const $isUserChange = Symbol('isUserChange');
 const $userTargetSpherical = Symbol('userTargetSpherical');
 
 // Pointer state
@@ -192,7 +192,7 @@ export class SmoothControls extends EventDispatcher {
   private[$spherical]: Spherical = new Spherical();
   private[$targetSpherical]: Spherical = new Spherical();
   private[$previousPosition]: Vector3 = new Vector3();
-  private[$isUserAdjust]: boolean = false;
+  private[$isUserChange]: boolean = false;
   private[$userTargetSpherical]: Spherical = new Spherical();
 
   private[$pointerIsDown]: boolean = false;
@@ -357,9 +357,7 @@ export class SmoothControls extends EventDispatcher {
     this[$targetSpherical].radius = nextRadius;
     this[$targetSpherical].makeSafe();
 
-    // this may reset isUserAdjust but if setOrbit is called via this[$userAdjustOrbit]
-    // then this will be set to true before `update` is called
-    this[$isUserAdjust] = sphericalEqual(this[$targetSpherical], this[$userTargetSpherical]);
+    this[$isUserChange] = sphericalEqual(this[$targetSpherical], this[$userTargetSpherical]);
 
     return true;
   }
@@ -444,7 +442,7 @@ export class SmoothControls extends EventDispatcher {
     if (!this[$previousPosition].equals(this.camera.position)) {
       this[$previousPosition].copy(this.camera.position);
 
-      const source = this[$isUserAdjust] ? USER_INTERACTION_CHANGE_SOURCE : DEFAULT_INTERACTION_CHANGE_SOURCE;
+      const source = this[$isUserChange] ? USER_INTERACTION_CHANGE_SOURCE : DEFAULT_INTERACTION_CHANGE_SOURCE;
 
       this.dispatchEvent({type: 'change', source});
     } else {
@@ -470,7 +468,7 @@ export class SmoothControls extends EventDispatcher {
   private[$userAdjustOrbit](deltaTheta: number, deltaPhi: number, deltaRadius: number): boolean {
     const handled = this.adjustOrbit(deltaTheta, deltaPhi, deltaRadius);
 
-    this[$isUserAdjust] = true;
+    this[$isUserChange] = true;
     this[$userTargetSpherical].copy(this[$targetSpherical]);
 
     return handled;
