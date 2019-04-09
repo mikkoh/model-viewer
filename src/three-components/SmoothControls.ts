@@ -92,7 +92,7 @@ const $canInteract = Symbol('canInteract');
 const $interactionEnabled = Symbol('interactionEnabled');
 const $userAdjustOrbit = Symbol('userAdjustOrbit');
 const $isUserAdjust = Symbol('isUserAdjust');
-const $userTargetSpherical = Symbol('isUserChange');
+const $userTargetSpherical = Symbol('userTargetSpherical');
 
 // Pointer state
 const $pointerIsDown = Symbol('pointerIsDown');
