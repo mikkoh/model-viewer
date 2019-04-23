@@ -92,7 +92,6 @@ const $canInteract = Symbol('canInteract');
 const $interactionEnabled = Symbol('interactionEnabled');
 const $userAdjustOrbit = Symbol('userAdjustOrbit');
 const $isUserChange = Symbol('isUserChange');
-const $userTargetSpherical = Symbol('userTargetSpherical');
 
 // Pointer state
 const $pointerIsDown = Symbol('pointerIsDown');
@@ -152,20 +151,6 @@ export interface ChangeEvent extends Event {
 }
 
 /**
- * Simply compares to sphericals to see if they are equal
- * 
- * @param spherical1 
- * @param spherical2 
- */
-function sphericalEqual(spherical1: Spherical, spherical2: Spherical): boolean {
-  return (
-    spherical1.phi === spherical2.phi &&
-    spherical2.theta === spherical2.theta &&
-    spherical1.radius === spherical2.radius
-  );
-}
-
-/**
  * SmoothControls is a Three.js helper for adding delightful pointer and
  * keyboard-based input to a staged Three.js scene. Its API is very similar to
  * OrbitControls, but it offers more opinionated (subjectively more delightful)
@@ -193,7 +178,6 @@ export class SmoothControls extends EventDispatcher {
   private[$targetSpherical]: Spherical = new Spherical();
   private[$previousPosition]: Vector3 = new Vector3();
   private[$isUserChange]: boolean = false;
-  private[$userTargetSpherical]: Spherical = new Spherical();
 
   private[$pointerIsDown]: boolean = false;
   private[$lastPointerPosition]: Vector2 = new Vector2();
@@ -357,7 +341,7 @@ export class SmoothControls extends EventDispatcher {
     this[$targetSpherical].radius = nextRadius;
     this[$targetSpherical].makeSafe();
 
-    this[$isUserChange] = sphericalEqual(this[$targetSpherical], this[$userTargetSpherical]);
+    this[$isUserChange] = false;
 
     return true;
   }
@@ -469,7 +453,6 @@ export class SmoothControls extends EventDispatcher {
     const handled = this.adjustOrbit(deltaTheta, deltaPhi, deltaRadius);
 
     this[$isUserChange] = true;
-    this[$userTargetSpherical].copy(this[$targetSpherical]);
 
     return handled;
   }

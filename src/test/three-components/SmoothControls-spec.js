@@ -382,7 +382,6 @@ suite('SmoothControls', () => {
             const expectedSources = [
               USER_INTERACTION_CHANGE_SOURCE,
               USER_INTERACTION_CHANGE_SOURCE,
-              USER_INTERACTION_CHANGE_SOURCE,
               DEFAULT_INTERACTION_CHANGE_SOURCE,
               DEFAULT_INTERACTION_CHANGE_SOURCE,
             ];
@@ -394,7 +393,6 @@ suite('SmoothControls', () => {
 
             dispatchSyntheticEvent(element, 'keydown', {keyCode: KeyCode.UP});
             
-            controls.update(performance.now, ONE_FRAME_DELTA);
             controls.update(performance.now, ONE_FRAME_DELTA);
             controls.update(performance.now, ONE_FRAME_DELTA);
 
@@ -403,43 +401,11 @@ suite('SmoothControls', () => {
             controls.update(performance.now, ONE_FRAME_DELTA);
             controls.update(performance.now, ONE_FRAME_DELTA);
 
-            expect(changeSource.length).to.equal(5);
+            expect(changeSource.length).to.equal(4);
             expect(changeSource).to.eql(expectedSources);
           });
 
-          test('continues to end "user-interaction" if setOrbit is called with the same value', () => {
-            const expectedSources = [
-              USER_INTERACTION_CHANGE_SOURCE,
-              USER_INTERACTION_CHANGE_SOURCE,
-              USER_INTERACTION_CHANGE_SOURCE,
-              USER_INTERACTION_CHANGE_SOURCE,
-              USER_INTERACTION_CHANGE_SOURCE,
-            ];
-            let changeSource = [];
-
-            controls.addEventListener('change', ({source}) => {
-              changeSource.push(source);
-            });
-
-            dispatchSyntheticEvent(element, 'keydown', {keyCode: KeyCode.UP});
-            controls.update(performance.now, ONE_FRAME_DELTA);
-            controls.update(performance.now, ONE_FRAME_DELTA);
-            controls.update(performance.now, ONE_FRAME_DELTA);
-            
-            controls.setOrbit(
-              controls[$targetSpherical].theta,
-              controls[$targetSpherical].phi,
-              controls[$targetSpherical].radius,
-            );
-
-            controls.update(performance.now, ONE_FRAME_DELTA);
-            controls.update(performance.now, ONE_FRAME_DELTA);
-
-            expect(changeSource.length).to.equal(5);
-            expect(changeSource).to.eql(expectedSources);
-          });
         });
-
       });
     });
   });
