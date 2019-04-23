@@ -15,7 +15,7 @@
 
 import {PerspectiveCamera, Spherical, Vector3} from 'three';
 
-import {DEFAULT_OPTIONS, KeyCode, SmoothControls, $targetSpherical} from '../../three-components/SmoothControls.js';
+import {DEFAULT_OPTIONS, KeyCode, SmoothControls} from '../../three-components/SmoothControls.js';
 import {step} from '../../utilities';
 import {dispatchSyntheticEvent} from '../helpers.js';
 
