@@ -285,23 +285,23 @@ suite('ModelViewerElementBase with ControlsMixin', () => {
         expect(controls).to.be.ok;
       });
 
-      test(
-          'requires focus to interact if policy is set to allow-when-focused',
-          async () => {
-            element.interactionPolicy = 'allow-when-focused';
-            await timePasses();
-            expect(controls.options.interactionPolicy)
-                .to.be.equal('allow-when-focused');
-          });
+      // test(
+      //     'requires focus to interact if policy is set to allow-when-focused',
+      //     async () => {
+      //       element.interactionPolicy = 'allow-when-focused';
+      //       await timePasses();
+      //       expect(controls.options.interactionPolicy)
+      //           .to.be.equal('allow-when-focused');
+      //     });
 
-      test(
-          'does not require focus to interact if policy is set to always-allow',
-          async () => {
-            element.interactionPolicy = 'always-allow';
-            await timePasses();
-            expect(controls.options.interactionPolicy)
-                .to.be.equal('always-allow');
-          });
+      // test(
+      //     'does not require focus to interact if policy is set to always-allow',
+      //     async () => {
+      //       element.interactionPolicy = 'always-allow';
+      //       await timePasses();
+      //       expect(controls.options.interactionPolicy)
+      //           .to.be.equal('always-allow');
+      //     });
 
       test('sets max radius greater than the camera framed distance', () => {
         const cameraDistance = element[$scene].camera.position.distanceTo(
@@ -329,6 +329,142 @@ suite('ModelViewerElementBase with ControlsMixin', () => {
 
           expect(event.detail.source)
               .to.be.equal(ChangeSource.USER_INTERACTION);
+        });
+      });
+
+      suite('interaction policy', () => {
+        suite('allow-when-focused', () => {
+          setup(() => {
+            element.cameraControls = true;
+            element.interactionPolicy = 'allow-when-focused';
+
+            element[$scene].canvas.blur();
+
+            settleControls(controls);
+          });
+
+          test('interaction is enabled on focus', () => {
+            // dispatchSyntheticEvent(element[$scene].canvas, 'focus');
+            element[$scene].canvas.focus();
+
+            expect(controls.interactionEnabled).to.equal(true);
+          });
+
+          test('interaction is disabled on blur', () => {
+            dispatchSyntheticEvent(element[$scene].canvas, 'blur');
+            // element[$scene].canvas.blur();
+
+            expect(controls.interactionEnabled).to.equal(false);
+          });
+
+          test('does not zoom when scrolling while blurred', () => {
+            dispatchSyntheticEvent(element[$scene].canvas, 'blur');
+            // element[$scene].canvas.blur();
+
+            const radius = controls.getCameraSpherical().radius;
+            expect(controls.getFieldOfView())
+              .to.be.closeTo(controls.options.maximumFieldOfView!, 0.00001);
+
+            dispatchSyntheticEvent(element, 'wheel', {deltaY: -1});
+
+            settleControls(controls);
+
+            expect(controls.getCameraSpherical().radius).to.be.equal(radius);
+            expect(controls.getFieldOfView())
+              .to.be.closeTo(controls.options.maximumFieldOfView!, 0.00001);
+          });
+
+          test('does not orbit when pointing while blurred', () => {
+            dispatchSyntheticEvent(element[$scene].canvas, 'blur');
+            // element[$scene].canvas.blur();
+
+            const originalPhi = controls.getCameraSpherical().phi;
+
+            interactWith(element[$canvas]);
+
+            settleControls(controls);
+
+            // dispatchSyntheticEvent(element, 'mousedown', {clientX: 0, clientY: 10});
+            // dispatchSyntheticEvent(element, 'mousemove', {clientX: 0, clientY: 0});
+
+            expect(controls.getCameraSpherical().phi).to.be.equal(originalPhi);
+          });
+
+          test('does orbit when pointing while focused', () => {
+            element[$scene].canvas.focus();
+            // dispatchSyntheticEvent(element[$scene].canvas, 'focus');
+
+            const originalPhi = controls.getCameraSpherical().phi;
+
+            interactWith(element[$canvas]);
+
+            settleControls(controls);
+            // dispatchSyntheticEvent(element, 'mousedown', {clientX: 0, clientY: 10});
+            // dispatchSyntheticEvent(element, 'mousemove', {clientX: 0, clientY: 0});
+
+            expect(controls.getCameraSpherical().phi).not.to.be.equal(originalPhi);
+          });
+
+          test('does zoom when scrolling while focused', () => {
+            expect(controls.getFieldOfView())
+                .to.be.closeTo(controls.options.maximumFieldOfView!, 0.00001);
+
+            element[$scene].canvas.focus();
+
+            dispatchSyntheticEvent(element, 'wheel', {deltaY: -1});
+
+            settleControls(controls);
+
+            expect(controls.getFieldOfView())
+                .to.be.lessThan(controls.options.maximumFieldOfView!);
+          });
+        });
+
+        suite('always-allow', () => {
+          setup(() => {
+            element.cameraControls = true;
+            element.interactionPolicy = 'always-allow';
+
+            settleControls(controls);
+          });
+
+          test('interaction is enabled', () => {
+            expect(controls.interactionEnabled).to.be.ok;
+          });
+
+          // test('orbits when pointing, even while blurred', () => {
+          //   element[$scene].canvas.blur();
+
+          //   const originalPhi = controls.getCameraSpherical().phi;
+
+          //   dispatchSyntheticEvent(
+          //       element, 'mousedown', {clientX: 0, clientY: 10});
+          //   dispatchSyntheticEvent(
+          //       element, 'mousemove', {clientX: 0, clientY: 0});
+
+          //   settleControls(controls);
+
+          //   expect(controls.getCameraSpherical().phi)
+          //       .to.be.greaterThan(originalPhi);
+          // });
+
+          // test('zooms when scrolling, even while blurred', () => {
+          //   element[$scene].canvas.blur();
+
+          //   const originalFOV = controls.getFieldOfView();
+
+          //   expect(controls.getFieldOfView())
+          //       .to.be.closeTo(controls.options.maximumFieldOfView!, 0.00001);
+
+          //   dispatchSyntheticEvent(element, 'wheel', {deltaY: -1});
+
+          //   settleControls(controls);
+
+          //   expect(controls.getFieldOfView())
+          //       .not.to.equal(originalFOV);
+          //   expect(controls.getFieldOfView())
+          //       .to.be.lessThan(controls.options.maximumFieldOfView!);
+          // });
         });
       });
 

@@ -29,8 +29,8 @@ const HALF_PI = Math.PI / 2.0;
 const QUARTER_PI = HALF_PI / 2.0;
 const THREE_QUARTERS_PI = HALF_PI + QUARTER_PI;
 
-const USER_INTERACTION_CHANGE_SOURCE = 'user-interaction';
-const DEFAULT_INTERACTION_CHANGE_SOURCE = 'none';
+// const USER_INTERACTION_CHANGE_SOURCE = 'user-interaction';
+// const DEFAULT_INTERACTION_CHANGE_SOURCE = 'none';
 
 // NOTE(cdata): Precision is a bit off when comparing e.g., expected camera
 // direction in practice:
@@ -296,7 +296,7 @@ suite('SmoothControls', () => {
           setup(() => {
             controls.applyOptions({
               eventHandlingBehavior: 'prevent-all',
-              interactionPolicy: 'always-allow'
+              // interactionPolicy: 'always-allow'
             });
           });
 
@@ -324,168 +324,168 @@ suite('SmoothControls', () => {
         });
       });
 
-      suite('interaction policy', () => {
-        suite('allow-when-focused', () => {
-          setup(() => {
-            controls.applyOptions({interactionPolicy: 'allow-when-focused'});
-            settleControls(controls);
-          });
+      // suite('interaction policy', () => {
+      //   suite('allow-when-focused', () => {
+      //     setup(() => {
+      //       controls.applyOptions({interactionPolicy: 'allow-when-focused'});
+      //       settleControls(controls);
+      //     });
 
-          test('does not zoom when scrolling while blurred', () => {
-            const radius = controls.getCameraSpherical().radius;
-            expect(controls.getFieldOfView())
-                .to.be.closeTo(DEFAULT_OPTIONS.maximumFieldOfView!, 0.00001);
+      //     test('does not zoom when scrolling while blurred', () => {
+      //       const radius = controls.getCameraSpherical().radius;
+      //       expect(controls.getFieldOfView())
+      //           .to.be.closeTo(DEFAULT_OPTIONS.maximumFieldOfView!, 0.00001);
 
-            dispatchSyntheticEvent(element, 'wheel', {deltaY: -1});
+      //       dispatchSyntheticEvent(element, 'wheel', {deltaY: -1});
 
-            settleControls(controls);
+      //       settleControls(controls);
 
-            expect(controls.getCameraSpherical().radius).to.be.equal(radius);
-            expect(controls.getFieldOfView())
-                .to.be.closeTo(DEFAULT_OPTIONS.maximumFieldOfView!, 0.00001);
-          });
+      //       expect(controls.getCameraSpherical().radius).to.be.equal(radius);
+      //       expect(controls.getFieldOfView())
+      //           .to.be.closeTo(DEFAULT_OPTIONS.maximumFieldOfView!, 0.00001);
+      //     });
 
-          test('does not orbit when pointing while blurred', () => {
-            const originalPhi = controls.getCameraSpherical().phi;
+      //     test('does not orbit when pointing while blurred', () => {
+      //       const originalPhi = controls.getCameraSpherical().phi;
 
-            dispatchSyntheticEvent(
-                element, 'mousedown', {clientX: 0, clientY: 10});
-            dispatchSyntheticEvent(
-                element, 'mousemove', {clientX: 0, clientY: 0});
+      //       dispatchSyntheticEvent(
+      //           element, 'mousedown', {clientX: 0, clientY: 10});
+      //       dispatchSyntheticEvent(
+      //           element, 'mousemove', {clientX: 0, clientY: 0});
 
-            expect(controls.getCameraSpherical().phi).to.be.equal(originalPhi);
-          });
+      //       expect(controls.getCameraSpherical().phi).to.be.equal(originalPhi);
+      //     });
 
-          test('does zoom when scrolling while focused', () => {
-            expect(controls.getFieldOfView())
-                .to.be.closeTo(DEFAULT_OPTIONS.maximumFieldOfView!, 0.00001);
+      //     test('does zoom when scrolling while focused', () => {
+      //       expect(controls.getFieldOfView())
+      //           .to.be.closeTo(DEFAULT_OPTIONS.maximumFieldOfView!, 0.00001);
 
-            element.focus();
+      //       element.focus();
 
-            dispatchSyntheticEvent(element, 'wheel', {deltaY: -1});
+      //       dispatchSyntheticEvent(element, 'wheel', {deltaY: -1});
 
-            settleControls(controls);
+      //       settleControls(controls);
 
-            expect(controls.getFieldOfView())
-                .to.be.lessThan(DEFAULT_OPTIONS.maximumFieldOfView!);
-          });
-        });
+      //       expect(controls.getFieldOfView())
+      //           .to.be.lessThan(DEFAULT_OPTIONS.maximumFieldOfView!);
+      //     });
+      //   });
 
-        suite('always-allow', () => {
-          setup(() => {
-            controls.applyOptions({interactionPolicy: 'always-allow'});
-            settleControls(controls);
-          });
+      //   suite('always-allow', () => {
+      //     setup(() => {
+      //       controls.applyOptions({interactionPolicy: 'always-allow'});
+      //       settleControls(controls);
+      //     });
 
-          test('orbits when pointing, even while blurred', () => {
-            const originalPhi = controls.getCameraSpherical().phi;
+          // test('orbits when pointing, even while blurred', () => {
+          //   const originalPhi = controls.getCameraSpherical().phi;
 
-            dispatchSyntheticEvent(
-                element, 'mousedown', {clientX: 0, clientY: 10});
-            dispatchSyntheticEvent(
-                element, 'mousemove', {clientX: 0, clientY: 0});
+          //   dispatchSyntheticEvent(
+          //       element, 'mousedown', {clientX: 0, clientY: 10});
+          //   dispatchSyntheticEvent(
+          //       element, 'mousemove', {clientX: 0, clientY: 0});
 
-            settleControls(controls);
+          //   settleControls(controls);
 
-            expect(controls.getCameraSpherical().phi)
-                .to.be.greaterThan(originalPhi);
-          });
+          //   expect(controls.getCameraSpherical().phi)
+          //       .to.be.greaterThan(originalPhi);
+          // });
 
-          test('zooms when scrolling, even while blurred', () => {
-            expect(controls.getFieldOfView())
-                .to.be.closeTo(DEFAULT_OPTIONS.maximumFieldOfView!, 0.00001);
+      //     test('zooms when scrolling, even while blurred', () => {
+      //       expect(controls.getFieldOfView())
+      //           .to.be.closeTo(DEFAULT_OPTIONS.maximumFieldOfView!, 0.00001);
 
-            dispatchSyntheticEvent(element, 'wheel', {deltaY: -1});
+      //       dispatchSyntheticEvent(element, 'wheel', {deltaY: -1});
 
-            settleControls(controls);
+      //       settleControls(controls);
 
-            expect(controls.getFieldOfView())
-                .to.be.lessThan(DEFAULT_OPTIONS.maximumFieldOfView!);
-          });
-        });
+      //       expect(controls.getFieldOfView())
+      //           .to.be.lessThan(DEFAULT_OPTIONS.maximumFieldOfView!);
+      //     });
+      //   });
 
-        suite('events', () => {
-          test('dispatches "change" on user interaction', () => {
-            let didCall = false;
-            let changeSource;
+      //   suite('events', () => {
+      //     test('dispatches "change" on user interaction', () => {
+      //       let didCall = false;
+      //       let changeSource;
 
-            controls.addEventListener('change', ({source}) => {
-              didCall = true;
-              changeSource = source;
-            });
+      //       controls.addEventListener('change', ({source}) => {
+      //         didCall = true;
+      //         changeSource = source;
+      //       });
 
-            dispatchSyntheticEvent(element, 'keydown', {keyCode: KeyCode.UP});
-            settleControls(controls);
+      //       dispatchSyntheticEvent(element, 'keydown', {keyCode: KeyCode.UP});
+      //       settleControls(controls);
 
-            expect(didCall).to.be.true;
-            expect(changeSource).to.equal(USER_INTERACTION_CHANGE_SOURCE);
-          });
+      //       expect(didCall).to.be.true;
+      //       expect(changeSource).to.equal(USER_INTERACTION_CHANGE_SOURCE);
+      //     });
 
-          test('dispatches "change" on direct orbit change', () => {
-            let didCall = false;
-            let changeSource;
+      //     test('dispatches "change" on direct orbit change', () => {
+      //       let didCall = false;
+      //       let changeSource;
 
-            controls.addEventListener('change', ({source}) => {
-              didCall = true;
-              changeSource = source;
-            });
+      //       controls.addEventListener('change', ({source}) => {
+      //         didCall = true;
+      //         changeSource = source;
+      //       });
 
-            controls.setOrbit(33, 33, 33);
-            settleControls(controls);
+      //       controls.setOrbit(33, 33, 33);
+      //       settleControls(controls);
 
-            expect(didCall).to.be.true;
-            expect(changeSource).to.equal(DEFAULT_INTERACTION_CHANGE_SOURCE);
-          });
+      //       expect(didCall).to.be.true;
+      //       expect(changeSource).to.equal(DEFAULT_INTERACTION_CHANGE_SOURCE);
+      //     });
 
-          test('sends "user-interaction" multiple times', () => {
-            const expectedSources = [
-              USER_INTERACTION_CHANGE_SOURCE,
-              USER_INTERACTION_CHANGE_SOURCE,
-              USER_INTERACTION_CHANGE_SOURCE,
-            ];
-            let changeSource: Array<string> = [];
+      //     test('sends "user-interaction" multiple times', () => {
+      //       const expectedSources = [
+      //         USER_INTERACTION_CHANGE_SOURCE,
+      //         USER_INTERACTION_CHANGE_SOURCE,
+      //         USER_INTERACTION_CHANGE_SOURCE,
+      //       ];
+      //       let changeSource: Array<string> = [];
 
-            controls.addEventListener('change', ({source}) => {
-              changeSource.push(source);
-            });
+      //       controls.addEventListener('change', ({source}) => {
+      //         changeSource.push(source);
+      //       });
 
-            dispatchSyntheticEvent(element, 'keydown', {keyCode: KeyCode.UP});
-            controls.update(performance.now(), ONE_FRAME_DELTA);
-            controls.update(performance.now(), ONE_FRAME_DELTA);
-            controls.update(performance.now(), ONE_FRAME_DELTA);
+      //       dispatchSyntheticEvent(element, 'keydown', {keyCode: KeyCode.UP});
+      //       controls.update(performance.now(), ONE_FRAME_DELTA);
+      //       controls.update(performance.now(), ONE_FRAME_DELTA);
+      //       controls.update(performance.now(), ONE_FRAME_DELTA);
 
-            expect(changeSource.length).to.equal(3);
-            expect(changeSource).to.eql(expectedSources);
-          });
+      //       expect(changeSource.length).to.equal(3);
+      //       expect(changeSource).to.eql(expectedSources);
+      //     });
 
-          test('does not send "user-interaction" after setOrbit', () => {
-            const expectedSources = [
-              USER_INTERACTION_CHANGE_SOURCE,
-              USER_INTERACTION_CHANGE_SOURCE,
-              DEFAULT_INTERACTION_CHANGE_SOURCE,
-              DEFAULT_INTERACTION_CHANGE_SOURCE,
-            ];
-            let changeSource: Array<string> = [];
+      //     test('does not send "user-interaction" after setOrbit', () => {
+      //       const expectedSources = [
+      //         USER_INTERACTION_CHANGE_SOURCE,
+      //         USER_INTERACTION_CHANGE_SOURCE,
+      //         DEFAULT_INTERACTION_CHANGE_SOURCE,
+      //         DEFAULT_INTERACTION_CHANGE_SOURCE,
+      //       ];
+      //       let changeSource: Array<string> = [];
 
-            controls.addEventListener('change', ({source}) => {
-              changeSource.push(source);
-            });
+      //       controls.addEventListener('change', ({source}) => {
+      //         changeSource.push(source);
+      //       });
 
-            dispatchSyntheticEvent(element, 'keydown', {keyCode: KeyCode.UP});
+      //       dispatchSyntheticEvent(element, 'keydown', {keyCode: KeyCode.UP});
 
-            controls.update(performance.now(), ONE_FRAME_DELTA);
-            controls.update(performance.now(), ONE_FRAME_DELTA);
+      //       controls.update(performance.now(), ONE_FRAME_DELTA);
+      //       controls.update(performance.now(), ONE_FRAME_DELTA);
 
-            controls.setOrbit(3, 3, 3);
+      //       controls.setOrbit(3, 3, 3);
 
-            controls.update(performance.now(), ONE_FRAME_DELTA);
-            controls.update(performance.now(), ONE_FRAME_DELTA);
+      //       controls.update(performance.now(), ONE_FRAME_DELTA);
+      //       controls.update(performance.now(), ONE_FRAME_DELTA);
 
-            expect(changeSource.length).to.equal(4);
-            expect(changeSource).to.eql(expectedSources);
-          });
-        });
-      });
+      //       expect(changeSource.length).to.equal(4);
+      //       expect(changeSource).to.eql(expectedSources);
+      //     });
+      //   });
+      // });
     });
   });
 });

@@ -17,7 +17,7 @@ import {property} from 'lit-element';
 import {Event, PerspectiveCamera, Spherical, Vector3} from 'three';
 
 import {deserializeAngleToDeg, deserializeSpherical, deserializeVector3} from '../conversions.js';
-import ModelViewerElementBase, {$ariaLabel, $loadedTime, $needsRender, $onModelLoad, $onResize, $scene, $tick} from '../model-viewer-base.js';
+import ModelViewerElementBase, {$ariaLabel, $loadedTime, $needsRender, $onModelLoad, $onResize, $scene, $tick, $canvas} from '../model-viewer-base.js';
 import {DEFAULT_FOV_DEG} from '../three-components/Model.js';
 import {ChangeEvent, ChangeSource, SmoothControls} from '../three-components/SmoothControls.js';
 import {Constructor} from '../utilities.js';
@@ -44,7 +44,7 @@ const InteractionPromptStrategy:
 
 const InteractionPolicy: {[index: string]: InteractionPolicy} = {
   ALWAYS_ALLOW: 'always-allow',
-  WHEN_FOCUSED: 'allow-when-focused'
+  WHEN_FOCUSED: 'allow-when-focused',
 };
 
 export const DEFAULT_CAMERA_ORBIT = '0deg 75deg 105%';
@@ -82,6 +82,7 @@ const $updateCamera = Symbol('updateCamera');
 const $updateCameraOrbit = Symbol('updateCameraOrbit');
 const $updateCameraTarget = Symbol('updateCameraTarget');
 const $updateFieldOfView = Symbol('updateFieldOfView');
+const $determineInteractionEnabledOrDisabled = Symbol('determineInteractionEnabledOrDisabled');
 
 const $blurHandler = Symbol('blurHandler');
 const $focusHandler = Symbol('focusHandler');
@@ -205,21 +206,19 @@ export const ControlsMixin = <T extends Constructor<ModelViewerElementBase>>(
     updated(changedProperties: Map<string, any>) {
       super.updated(changedProperties);
 
-      const controls = this[$controls];
+      // const controls = this[$controls];
       const scene = (this as any)[$scene];
 
       if (changedProperties.has('cameraControls')) {
         if (this.cameraControls) {
-          controls.enableInteraction();
-
           scene.canvas.addEventListener('focus', this[$focusHandler]);
           scene.canvas.addEventListener('blur', this[$blurHandler]);
         } else {
           scene.canvas.removeEventListener('focus', this[$focusHandler]);
           scene.canvas.removeEventListener('blur', this[$blurHandler]);
-
-          controls.disableInteraction();
         }
+
+        this[$determineInteractionEnabledOrDisabled]();
       }
 
       if (changedProperties.has('interactionPrompt')) {
@@ -229,8 +228,7 @@ export const ControlsMixin = <T extends Constructor<ModelViewerElementBase>>(
       }
 
       if (changedProperties.has('interactionPolicy')) {
-        const interactionPolicy = this.interactionPolicy;
-        controls.applyOptions({interactionPolicy});
+        this[$determineInteractionEnabledOrDisabled]();
       }
 
       if (changedProperties.has('cameraOrbit')) {
@@ -249,6 +247,33 @@ export const ControlsMixin = <T extends Constructor<ModelViewerElementBase>>(
         this[$controls].jumpToGoal();
         this[$jumpCamera] = false;
       }
+    }
+
+    [$determineInteractionEnabledOrDisabled]() {
+      const rootNode = this.getRootNode() as Document | ShadowRoot | null;
+      const controls = this[$controls];
+
+      if (!this.cameraControls) {
+        controls.disableInteraction();
+
+        return;
+      }
+
+      if (this.interactionPolicy === InteractionPolicy.WHEN_FOCUSED) {
+        console.log('mikko');
+        console.log(rootNode && rootNode.activeElement);
+        console.log(rootNode && rootNode.activeElement === this);
+
+        if (rootNode && (rootNode.activeElement === this || rootNode.activeElement === this[$canvas])) {
+          controls.enableInteraction();
+        } else {
+          controls.disableInteraction();
+        }
+
+        return;
+      }
+
+      controls.enableInteraction();
     }
 
     [$updateFieldOfView]() {
@@ -438,11 +463,15 @@ export const ControlsMixin = <T extends Constructor<ModelViewerElementBase>>(
       if (this[$shouldPromptUserToInteract]) {
         this[$waitingToPromptUser] = true;
       }
+
+      this[$determineInteractionEnabledOrDisabled]();
     }
 
     [$onBlur]() {
       this[$waitingToPromptUser] = false;
       this[$promptElement].classList.remove('visible');
+
+      this[$determineInteractionEnabledOrDisabled]();
     }
 
     [$onChange]({source}: ChangeEvent) {

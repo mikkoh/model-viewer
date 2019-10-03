@@ -17,7 +17,6 @@ import {Euler, Event as ThreeEvent, EventDispatcher, PerspectiveCamera, Spherica
 import {clamp} from '../utilities.js';
 
 export type EventHandlingBehavior = 'prevent-all'|'prevent-handled';
-export type InteractionPolicy = 'always-allow'|'allow-when-focused';
 export type TouchMode = 'rotate'|'zoom';
 
 interface Pointer {
@@ -43,8 +42,6 @@ export interface SmoothControlsOptions {
   maximumFieldOfView?: number;
   // Controls when events will be cancelled (always, or only when handled)
   eventHandlingBehavior?: EventHandlingBehavior;
-  // Controls when interaction is allowed (always, or only when focused)
-  interactionPolicy?: InteractionPolicy;
 }
 
 export const DEFAULT_OPTIONS = Object.freeze<SmoothControlsOptions>({
@@ -56,8 +53,7 @@ export const DEFAULT_OPTIONS = Object.freeze<SmoothControlsOptions>({
   maximumAzimuthalAngle: Infinity,
   minimumFieldOfView: 10,
   maximumFieldOfView: 45,
-  eventHandlingBehavior: 'prevent-all',
-  interactionPolicy: 'always-allow'
+  eventHandlingBehavior: 'prevent-all'
 });
 
 const $velocity = Symbol('v');
@@ -560,12 +556,7 @@ export class SmoothControls extends EventDispatcher {
   }
 
   private get[$canInteract](): boolean {
-    if (this[$options].interactionPolicy == 'allow-when-focused') {
-      const rootNode = this.element.getRootNode() as Document | ShadowRoot;
-      return rootNode.activeElement === this.element;
-    }
-
-    return this[$options].interactionPolicy === 'always-allow';
+    return this[$interactionEnabled];
   }
 
   private[$userAdjustOrbit](
