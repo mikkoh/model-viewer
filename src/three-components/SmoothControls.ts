@@ -1,5 +1,4 @@
 /* @license
- * Copyright 2018 Google Inc. All Rights Reserved.
  * Licensed under the Apache License, Version 2.0 (the 'License');
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -13,17 +12,22 @@
  * limitations under the License.
  */
 
-import {Event as ThreeEvent, EventDispatcher, PerspectiveCamera, Quaternion, Spherical, Vector3} from 'three';
+import {Euler, Event as ThreeEvent, EventDispatcher, PerspectiveCamera, Spherical, Vector3} from 'three';
 
 import {clamp} from '../utilities.js';
 
 export type EventHandlingBehavior = 'prevent-all'|'prevent-handled';
-export type InteractionPolicy = 'always-allow'|'allow-when-focused';
+export type InteractionPolicy = 'always-allow'|'allow-when-focused'|'allow-toggle';
 export type TouchMode = 'rotate'|'zoom';
 
 interface Pointer {
-  clientX: number,
-  clientY: number,
+  clientX: number, clientY: number,
+}
+
+interface TwoPointerDistance {
+  deltaX: number,
+  deltaY: number,
+  distance: number,
 }
 
 export interface SmoothControlsOptions {
@@ -47,10 +51,12 @@ export interface SmoothControlsOptions {
   eventHandlingBehavior?: EventHandlingBehavior;
   // Controls when interaction is allowed (always, or only when focused)
   interactionPolicy?: InteractionPolicy;
+  // Mininum distance to move determine whether a drag happened
+  minDragDistance?: number;
 }
 
 export const DEFAULT_OPTIONS = Object.freeze<SmoothControlsOptions>({
-  minimumRadius: 1,
+  minimumRadius: 0,
   maximumRadius: 2,
   minimumPolarAngle: Math.PI / 8,
   maximumPolarAngle: Math.PI - Math.PI / 8,
@@ -59,7 +65,8 @@ export const DEFAULT_OPTIONS = Object.freeze<SmoothControlsOptions>({
   minimumFieldOfView: 10,
   maximumFieldOfView: 45,
   eventHandlingBehavior: 'prevent-all',
-  interactionPolicy: 'always-allow'
+  interactionPolicy: 'always-allow',
+  minDragDistance: 5,
 });
 
 const $velocity = Symbol('v');
@@ -80,8 +87,6 @@ const $targetDamperY = Symbol('targetDamperY');
 const $targetDamperZ = Symbol('targetDamperZ');
 
 const $options = Symbol('options');
-const $upQuaternion = Symbol('upQuaternion');
-const $upQuaternionInverse = Symbol('upQuaternionInverse');
 const $touchMode = Symbol('touchMode');
 const $canInteract = Symbol('canInteract');
 const $interactionEnabled = Symbol('interactionEnabled');
@@ -89,16 +94,17 @@ const $userAdjustOrbit = Symbol('userAdjustOrbit');
 const $isUserChange = Symbol('isUserChange');
 const $isStationary = Symbol('isMoving');
 const $moveCamera = Symbol('moveCamera');
+const $determineCursor = Symbol('determineCursor');
 
 // Pointer state
 const $pointerIsDown = Symbol('pointerIsDown');
 const $lastPointerPosition = Symbol('lastPointerPosition');
 const $lastTouches = Symbol('lastTouches');
+const $distanceMoved = Symbol('distanceMoved');
 
 // Value conversion methods
 const $pixelLengthToSphericalAngle = Symbol('pixelLengthToSphericalAngle');
-const $sphericalToPosition = Symbol('sphericalToPosition');
-const $twoTouchDistance = Symbol('twoTouchDistance');
+const $twoPointerDistance = Symbol('twoPointerDistance');
 const $wrapAngle = Symbol('wrapAngle');
 
 // Event handlers
@@ -115,6 +121,7 @@ const $handleSinglePointerMove = Symbol('handleSinglePointerMove');
 const $handlePointerDown = Symbol('handlePointerDown');
 const $handleSinglePointerDown = Symbol('handleSinglePointerDown');
 const $handlePointerUp = Symbol('handlePointerUp');
+const $handleSinglePointerUp = Symbol('handleSinglePointerUp');
 const $handleWheel = Symbol('handleWheel');
 const $handleKey = Symbol('handleKey');
 
@@ -125,7 +132,6 @@ const ZOOM_SENSITIVITY = 0.1;
 const DECAY_MILLISECONDS = 50;
 const NATURAL_FREQUENCY = 1 / DECAY_MILLISECONDS;
 const NIL_SPEED = 0.0002 * NATURAL_FREQUENCY;
-const UP = new Vector3(0, 1, 0);
 
 export const KeyCode = {
   PAGE_UP: 33,
@@ -225,8 +231,6 @@ export class SmoothControls extends EventDispatcher {
   private[$interactionEnabled]: boolean = false;
 
   private[$options]: SmoothControlsOptions;
-  private[$upQuaternion] = new Quaternion();
-  private[$upQuaternionInverse] = new Quaternion();
   private[$isUserChange] = false;
 
   private[$spherical] = new Spherical();
@@ -248,6 +252,7 @@ export class SmoothControls extends EventDispatcher {
     clientX: 0,
     clientY: 0,
   };
+  private[$distanceMoved] = 0;
   private[$lastTouches]: TouchList;
   private[$touchMode]: TouchMode;
 
@@ -264,9 +269,6 @@ export class SmoothControls extends EventDispatcher {
   constructor(
       readonly camera: PerspectiveCamera, readonly element: HTMLElement) {
     super();
-
-    this[$upQuaternion].setFromUnitVectors(camera.up, UP);
-    this[$upQuaternionInverse].copy(this[$upQuaternion]).inverse();
 
     this[$onMouseMove] = (event: Event) =>
         this[$handlePointerMove](event as MouseEvent);
@@ -287,7 +289,7 @@ export class SmoothControls extends EventDispatcher {
     this[$options] = Object.assign({}, DEFAULT_OPTIONS);
 
     this.setOrbit(0, Math.PI / 2, 1);
-    this.setFov(100);
+    this.setFieldOfView(100);
     this.jumpToGoal();
   }
 
@@ -308,8 +310,9 @@ export class SmoothControls extends EventDispatcher {
       self.addEventListener('mouseup', this[$onMouseUp]);
       self.addEventListener('touchend', this[$onTouchEnd]);
 
-      this.element.style.cursor = 'grab';
       this[$interactionEnabled] = true;
+
+      this[$determineCursor]();
     }
   }
 
@@ -327,9 +330,18 @@ export class SmoothControls extends EventDispatcher {
       self.removeEventListener('mouseup', this[$onMouseUp]);
       self.removeEventListener('touchend', this[$onTouchEnd]);
 
-      element.style.cursor = '';
       this[$interactionEnabled] = false;
+
+      this[$determineCursor]();
     }
+  }
+
+  wasDragInteraction() {
+    return this[$distanceMoved] >= this.options.minDragDistance!;
+  }
+
+  distanceMoved() {
+    return this[$distanceMoved];
   }
 
   /**
@@ -374,13 +386,15 @@ export class SmoothControls extends EventDispatcher {
     }
     this[$spherical].copy(this[$goalSpherical]);
     this[$moveCamera]();
+
+    this[$determineCursor]();
   }
 
   /**
    * Sets the non-interpolated camera parameters
    */
   updateIntrinsics(nearPlane: number, farPlane: number, aspect: number) {
-    this.camera.near = nearPlane;
+    this.camera.near = Math.max(nearPlane, farPlane / 1000);
     this.camera.far = farPlane;
     this.camera.aspect = aspect;
     this.camera.updateProjectionMatrix();
@@ -439,7 +453,7 @@ export class SmoothControls extends EventDispatcher {
   /**
    * Sets the goal field of view for the camera
    */
-  setFov(fov: number) {
+  setFieldOfView(fov: number) {
     const {minimumFieldOfView, maximumFieldOfView} = this[$options];
     fov = clamp(fov, minimumFieldOfView!, maximumFieldOfView!);
     this[$goalLogFov] = Math.log(fov);
@@ -461,21 +475,25 @@ export class SmoothControls extends EventDispatcher {
 
   /**
    * Adjust the orbital position of the camera relative to its current orbital
-   * position.
+   * position. Does not let the theta goal get more than pi ahead of the current
+   * theta, which ensures interpolation continues in the direction of the delta.
    */
   adjustOrbit(
       deltaTheta: number, deltaPhi: number, deltaRadius: number,
       deltaFov: number): boolean {
     const {theta, phi, radius} = this[$goalSpherical];
 
-    const goalTheta = theta - deltaTheta;
+    const dTheta = this[$spherical].theta - theta;
+    const dThetaLimit = Math.PI - 0.001;
+    const goalTheta =
+        theta - clamp(deltaTheta, -dThetaLimit - dTheta, dThetaLimit - dTheta);
     const goalPhi = phi - deltaPhi;
     const goalRadius = radius + deltaRadius;
     let handled = this.setOrbit(goalTheta, goalPhi, goalRadius);
 
     if (deltaFov !== 0) {
       const goalLogFov = this[$goalLogFov] + deltaFov;
-      this.setFov(Math.exp(goalLogFov));
+      this.setFieldOfView(Math.exp(goalLogFov));
       handled = true;
     }
 
@@ -550,8 +568,10 @@ export class SmoothControls extends EventDispatcher {
   private[$moveCamera]() {
     // Derive the new camera position from the updated spherical:
     this[$spherical].makeSafe();
-    this[$sphericalToPosition](this[$spherical], this.camera.position);
-    this.camera.lookAt(this[$target]);
+    this.camera.position.setFromSpherical(this[$spherical]);
+    this.camera.position.add(this[$target]);
+    this.camera.setRotationFromEuler(new Euler(
+        this[$spherical].phi - Math.PI / 2, this[$spherical].theta, 0, 'YXZ'));
 
     if (this.camera.fov !== Math.exp(this[$logFov])) {
       this.camera.fov = Math.exp(this[$logFov]);
@@ -570,7 +590,7 @@ export class SmoothControls extends EventDispatcher {
       return rootNode.activeElement === this.element;
     }
 
-    return this[$options].interactionPolicy === 'always-allow';
+    return this[$options].interactionPolicy === 'always-allow' || this[$options].interactionPolicy === 'allow-toggle';
   }
 
   private[$userAdjustOrbit](
@@ -586,26 +606,26 @@ export class SmoothControls extends EventDispatcher {
 
   // Wraps to bewteen -pi and pi
   private[$wrapAngle](radians: number): number {
-    return (radians + Math.PI) % (2 * Math.PI) - Math.PI;
+    const normalized = (radians + Math.PI) / (2 * Math.PI);
+    const wrapped = normalized - Math.floor(normalized);
+    return wrapped * 2 * Math.PI - Math.PI;
   }
 
   private[$pixelLengthToSphericalAngle](pixelLength: number): number {
     return 2 * Math.PI * pixelLength / this.element.clientHeight;
   }
 
-  private[$sphericalToPosition](spherical: Spherical, position: Vector3) {
-    position.setFromSpherical(spherical);
-    position.applyQuaternion(this[$upQuaternionInverse]);
-    position.add(this[$target]);
-  }
+  private[$twoPointerDistance](pointerOne: Pointer, pointerTwo: Pointer): TwoPointerDistance {
+    const {clientX: xOne, clientY: yOne} = pointerOne;
+    const {clientX: xTwo, clientY: yTwo} = pointerTwo;
+    const deltaX = xTwo - xOne;
+    const deltaY = yTwo - yOne;
 
-  private[$twoTouchDistance](touchOne: Touch, touchTwo: Touch): number {
-    const {clientX: xOne, clientY: yOne} = touchOne;
-    const {clientX: xTwo, clientY: yTwo} = touchTwo;
-    const xDelta = xTwo - xOne;
-    const yDelta = yTwo - yOne;
-
-    return Math.sqrt(xDelta * xDelta + yDelta * yDelta);
+    return {
+      deltaX,
+      deltaY,
+      distance: Math.sqrt(deltaX * deltaX + deltaY * deltaY),
+    };
   }
 
   private[$handlePointerMove](event: MouseEvent|TouchEvent) {
@@ -623,10 +643,10 @@ export class SmoothControls extends EventDispatcher {
       switch (this[$touchMode]) {
         case 'zoom':
           if (this[$lastTouches].length > 1 && touches.length > 1) {
-            const lastTouchDistance = this[$twoTouchDistance](
-                this[$lastTouches][0], this[$lastTouches][1]);
+            const lastTouchDistance = this[$twoPointerDistance](
+                this[$lastTouches][0], this[$lastTouches][1]).distance;
             const touchDistance =
-                this[$twoTouchDistance](touches[0], touches[1]);
+                this[$twoPointerDistance](touches[0], touches[1]).distance;
             const deltaFov = -1 * ZOOM_SENSITIVITY *
                 (touchDistance - lastTouchDistance) / 10.0;
 
@@ -651,21 +671,24 @@ export class SmoothControls extends EventDispatcher {
   }
 
   private[$handleSinglePointerMove](pointer: Pointer): boolean {
+    const {
+      deltaX,
+      deltaY,
+      distance,
+    } = this[$twoPointerDistance](this[$lastPointerPosition], pointer);
+
     const {clientX, clientY} = pointer;
-    const deltaTheta =
-        this[$pixelLengthToSphericalAngle](clientX - this[$lastPointerPosition].clientX);
-    const deltaPhi =
-        this[$pixelLengthToSphericalAngle](clientY - this[$lastPointerPosition].clientY);
+    const deltaTheta = this[$pixelLengthToSphericalAngle](deltaX);
+    const deltaPhi = this[$pixelLengthToSphericalAngle](deltaY);
 
     this[$lastPointerPosition].clientX = clientX;
     this[$lastPointerPosition].clientY = clientY;
+    this[$distanceMoved] += distance;
 
     return this[$userAdjustOrbit](deltaTheta, deltaPhi, 0, 0);
   }
 
   private[$handlePointerDown](event: MouseEvent|TouchEvent) {
-    this[$pointerIsDown] = true;
-
     if (TOUCH_EVENT_RE.test(event.type)) {
       const {touches} = event as TouchEvent;
 
@@ -689,12 +712,32 @@ export class SmoothControls extends EventDispatcher {
   private[$handleSinglePointerDown](pointer: Pointer) {
     this[$lastPointerPosition].clientX = pointer.clientX;
     this[$lastPointerPosition].clientY = pointer.clientY;
-    this.element.style.cursor = 'grabbing';
+
+    this[$pointerIsDown] = true;
+    this[$distanceMoved] = 0;
+    this[$determineCursor]();
   }
 
-  private[$handlePointerUp](_event: MouseEvent|TouchEvent) {
-    this.element.style.cursor = 'grab';
+  private[$handlePointerUp](event: MouseEvent|TouchEvent) {
+    if (TOUCH_EVENT_RE.test(event.type)) {
+      const {touches} = event as TouchEvent;
+
+      if (this[$touchMode] === 'rotate') {
+        this[$handleSinglePointerUp](touches[0]);
+      }
+    } else {
+      this[$handleSinglePointerUp](event as MouseEvent);
+    }
+  }
+
+  private [$handleSinglePointerUp](pointer: Pointer) {
+    this[$distanceMoved] += this[$twoPointerDistance](
+      this[$lastPointerPosition],
+      pointer,
+    ).distance;
+
     this[$pointerIsDown] = false;
+    this[$determineCursor]();
   }
 
   private[$handleWheel](event: Event) {
@@ -749,6 +792,24 @@ export class SmoothControls extends EventDispatcher {
         (handled || this[$options].eventHandlingBehavior === 'prevent-all') &&
         event.cancelable) {
       event.preventDefault();
+    }
+  }
+
+  private[$determineCursor]() {
+    if (this[$pointerIsDown]) {
+      this.element.style.cursor = 'grabbing';
+      return;
+    }
+
+    if (this[$interactionEnabled]) {
+      this.element.style.cursor = 'grab';
+      return;
+    }
+
+    if (this[$options].interactionPolicy === 'allow-toggle') {
+      this.element.style.cursor = 'pointer';
+    } else {
+      this.element.style.cursor = '';
     }
   }
 }

@@ -1,5 +1,5 @@
 /* @license
- * Copyright 2018 Google Inc. All Rights Reserved.
+ * Copyright 2019 Google LLC. All Rights Reserved.
  * Licensed under the Apache License, Version 2.0 (the 'License');
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-import {BackSide, BoxBufferGeometry, Camera, Color, Event as ThreeEvent, Object3D, PerspectiveCamera, Scene, Shader, ShaderLib, ShaderMaterial} from 'three';
+import {BackSide, BoxBufferGeometry, Camera, Color, Event as ThreeEvent, Object3D, PerspectiveCamera, Scene, Shader, ShaderLib, ShaderMaterial, Vector3} from 'three';
 import {Mesh} from 'three';
 
 import ModelViewerElementBase from '../model-viewer-base.js';
@@ -52,25 +52,26 @@ const $paused = Symbol('paused');
  */
 export default class ModelScene extends Scene {
   private[$paused]: boolean = false;
-  private aspect: number;
 
+  public aspect = 1;
   public canvas: HTMLCanvasElement;
   public renderer: Renderer;
   public shadow: StaticShadow;
   public pivot: Object3D;
-  public width: number;
-  public height: number;
-  public framedHeight: number = 1;
-  public modelDepth: number = 1;
+  public pivotCenter: Vector3;
+  public width = 1;
+  public height = 1;
   public isVisible: boolean = false;
   public isDirty: boolean = false;
   public element: ModelViewerElementBase;
   public context: CanvasRenderingContext2D;
-  public exposure: number;
+  public exposure = 1;
   public model: Model;
-  public camera: PerspectiveCamera;
   public skyboxMesh: Mesh;
   public activeCamera: Camera;
+  // These default camera values are never used, as they are reset once the
+  // model is loaded and framing is computed.
+  public camera = new PerspectiveCamera(45, 1, 0.1, 100);
 
   constructor({canvas, element, width, height, renderer}: ModelSceneConfig) {
     super();
@@ -81,22 +82,19 @@ export default class ModelScene extends Scene {
     this.canvas = canvas;
     this.context = canvas.getContext('2d')!;
     this.renderer = renderer;
-    this.exposure = 1;
 
     this.model = new Model();
     this.shadow = new StaticShadow();
 
-    this.width = width;
-    this.height = height;
-    this.aspect = width / height;
     // These default camera values are never used, as they are reset once the
     // model is loaded and framing is computed.
-    this.camera = new PerspectiveCamera(45, this.aspect, 0.1, 100);
+    this.camera = new PerspectiveCamera(45, 1, 0.1, 100);
     this.camera.name = 'MainCamera';
 
     this.activeCamera = this.camera;
     this.pivot = new Object3D();
     this.pivot.name = 'Pivot';
+    this.pivotCenter = new Vector3;
 
     this.skyboxMesh = this.createSkyboxMesh();
 
@@ -145,44 +143,27 @@ export default class ModelScene extends Scene {
       this.height = Math.max(height, 1);
       // In practice, invocations of setSize are throttled at the element level,
       // so no need to throttle here:
-      this.updateFraming();
+      const dpr = resolveDpr();
+      this.canvas.width = this.width * dpr;
+      this.canvas.height = this.height * dpr;
+      this.canvas.style.width = `${this.width}px`;
+      this.canvas.style.height = `${this.height}px`;
+      this.aspect = this.width / this.height;
+
+      // Immediately queue a render to happen at microtask timing. This is
+      // necessary because setting the width and height of the canvas has the
+      // side-effect of clearing it, and also if we wait for the next rAF to
+      // render again we might get hit with yet-another-resize, or worse we
+      // may not actually be marked as dirty and so render will just not
+      // happen. Queuing a render to happen here means we will render twice on
+      // a resize frame, but it avoids most of the visual artifacts associated
+      // with other potential mitigations for this problem. See discussion in
+      // https://github.com/GoogleWebComponents/model-viewer/pull/619 for
+      // additional considerations.
+      Promise.resolve().then(() => {
+        this.renderer.render(performance.now());
+      });
     }
-  }
-
-  /**
-   * To frame the scene, a box is fit around the model such that the X and Z
-   * dimensions (modelDepth) are the same (for Y-rotation) and the X/Y ratio is
-   * the aspect ratio of the canvas (framedHeight is the Y dimension). At the
-   * ideal distance, the camera's fov exactly covers the front face of this box
-   * when looking down the Z-axis.
-   */
-  updateFraming() {
-    const dpr = resolveDpr();
-    this.canvas.width = this.width * dpr;
-    this.canvas.height = this.height * dpr;
-    this.canvas.style.width = `${this.width}px`;
-    this.canvas.style.height = `${this.height}px`;
-    this.aspect = this.width / this.height;
-
-    const {size} = this.model;
-    if (size.x != 0 || size.y != 0 || size.z != 0) {
-      this.modelDepth = Math.max(size.x, size.z);
-      this.framedHeight = Math.max(size.y, this.modelDepth / this.aspect);
-    }
-
-    // Immediately queue a render to happen at microtask timing. This is
-    // necessary because setting the width and height of the canvas has the
-    // side-effect of clearing it, and also if we wait for the next rAF to
-    // render again we might get hit with yet-another-resize, or worse we
-    // may not actually be marked as dirty and so render will just not
-    // happen. Queuing a render to happen here means we will render twice on
-    // a resize frame, but it avoids most of the visual artifacts associated
-    // with other potential mitigations for this problem. See discussion in
-    // https://github.com/GoogleWebComponents/model-viewer/pull/619 for
-    // additional considerations.
-    Promise.resolve().then(() => {
-      this.renderer.render(performance.now());
-    });
   }
 
   /**
@@ -213,10 +194,21 @@ export default class ModelScene extends Scene {
   }
 
   /**
+   * Sets the rotation of the model's pivot, around its pivotCenter point.
+   */
+  setRotation(radiansY: number) {
+    this.pivot.rotation.y = radiansY;
+    this.pivot.position.x = -this.pivotCenter.x;
+    this.pivot.position.z = -this.pivotCenter.z;
+    this.pivot.position.applyAxisAngle(this.pivot.up, radiansY);
+    this.pivot.position.x += this.pivotCenter.x;
+    this.pivot.position.z += this.pivotCenter.z;
+  }
+
+  /**
    * Called when the model's contents have loaded, or changed.
    */
   onModelLoad(event: {url: string}) {
-    this.updateFraming();
     this.updateStaticShadow();
     this.dispatchEvent({type: 'model-load', url: event.url});
   }
@@ -234,14 +226,14 @@ export default class ModelScene extends Scene {
     // capture is unrotated so it can be freely rotated when applied
     // as a texture.
     const currentRotation = this.pivot.rotation.y;
-    this.pivot.rotation.y = 0;
+    this.setRotation(0);
 
     this.shadow.render(this.renderer.renderer, this);
 
     // Lazily add the shadow so we're only displaying it once it has
     // a generated texture.
     this.pivot.add(this.shadow);
-    this.pivot.rotation.y = currentRotation;
+    this.setRotation(currentRotation);
   }
 
   createSkyboxMesh(): Mesh {

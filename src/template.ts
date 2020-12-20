@@ -1,5 +1,5 @@
 /* @license
- * Copyright 2018 Google Inc. All Rights Reserved.
+ * Copyright 2019 Google LLC. All Rights Reserved.
  * Licensed under the Apache License, Version 2.0 (the 'License');
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -45,6 +45,12 @@ template.innerHTML = `
       width: 100%;
       height: 100%;
       display: none;
+      /* NOTE(cdata): Chrome 76 and below apparently have a bug
+       * that causes our canvas not to display pixels unless it is
+       * on its own render layer
+       * @see https://github.com/GoogleWebComponents/model-viewer/pull/755#issuecomment-536597893
+       */
+      transform: translateZ(0);
     }
 
     canvas.show {

@@ -1,5 +1,5 @@
 /* @license
- * Copyright 2018 Google Inc. All Rights Reserved.
+ * Copyright 2019 Google LLC. All Rights Reserved.
  * Licensed under the Apache License, Version 2.0 (the 'License');
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -135,8 +135,6 @@ suite('SmoothControls', () => {
         test('changes the absolute distance to the target', () => {
           settleControls(controls);
 
-          expect(camera.position.length())
-              .to.be.equal(DEFAULT_OPTIONS.minimumRadius);
           controls.setOrbit(0, HALF_PI, 1.5);
           settleControls(controls);
           expect(camera.position.length()).to.be.equal(1.5);
@@ -158,6 +156,22 @@ suite('SmoothControls', () => {
           expect(controls.getCameraSpherical().theta)
               .to.be.closeTo(-QUARTER_PI, 0.0001);
         });
+
+        test(
+            'adjustOrbit does not move the goal theta more than pi past the current theta',
+            () => {
+              controls.adjustOrbit(-Math.PI * 3 / 2, 0, 0, 0);
+
+              controls.update(performance.now(), ONE_FRAME_DELTA);
+              const startingTheta = controls.getCameraSpherical().theta;
+              expect(startingTheta).to.be.greaterThan(0);
+
+              controls.adjustOrbit(-Math.PI * 3 / 2, 0, 0, 0);
+              settleControls(controls);
+              const goalTheta = controls.getCameraSpherical().theta;
+              expect(goalTheta).to.be.greaterThan(-Math.PI);
+              expect(goalTheta).to.be.lessThan(startingTheta - Math.PI);
+            });
       });
     });
 
@@ -265,12 +279,12 @@ suite('SmoothControls', () => {
         });
 
         test('prevents field of view from exceeding options', () => {
-          controls.setFov(5);
+          controls.setFieldOfView(5);
           settleControls(controls);
 
           expect(controls.getFieldOfView()).to.be.closeTo(15, 0.00001);
 
-          controls.setFov(30);
+          controls.setFieldOfView(30);
           settleControls(controls);
 
           expect(controls.getFieldOfView()).to.be.closeTo(20, 0.00001);
@@ -318,8 +332,7 @@ suite('SmoothControls', () => {
           });
 
           test('does not zoom when scrolling while blurred', () => {
-            expect(controls.getCameraSpherical().radius)
-                .to.be.equal(DEFAULT_OPTIONS.minimumRadius);
+            const radius = controls.getCameraSpherical().radius;
             expect(controls.getFieldOfView())
                 .to.be.closeTo(DEFAULT_OPTIONS.maximumFieldOfView!, 0.00001);
 
@@ -327,8 +340,7 @@ suite('SmoothControls', () => {
 
             settleControls(controls);
 
-            expect(controls.getCameraSpherical().radius)
-                .to.be.equal(DEFAULT_OPTIONS.minimumRadius);
+            expect(controls.getCameraSpherical().radius).to.be.equal(radius);
             expect(controls.getFieldOfView())
                 .to.be.closeTo(DEFAULT_OPTIONS.maximumFieldOfView!, 0.00001);
           });
@@ -389,6 +401,103 @@ suite('SmoothControls', () => {
 
             expect(controls.getFieldOfView())
                 .to.be.lessThan(DEFAULT_OPTIONS.maximumFieldOfView!);
+          });
+
+          test('handles cursor when interaction enabled', () => {
+            expect(element.style.cursor).to.be.equal('grab');
+          });
+
+          test('handles cursor when interaction start', () => {
+            dispatchSyntheticEvent(element, 'mousedown');
+
+            expect(element.style.cursor).to.be.equal('grabbing');
+          });
+
+          test('handles cursor when disabled', () => {
+            controls.disableInteraction();
+
+            expect(element.style.cursor).to.be.equal('');
+          });
+        });
+
+        suite('allow-toggle', () => {
+          setup(() => {
+            controls.applyOptions({interactionPolicy: 'allow-toggle'});
+            settleControls(controls);
+          });
+
+          test('handles cursor when interaction enabled', () => {
+            expect(element.style.cursor).to.be.equal('grab');
+          });
+
+          test('handles cursor when interaction start', () => {
+            dispatchSyntheticEvent(element, 'mousedown');
+
+            expect(element.style.cursor).to.be.equal('grabbing');
+          });
+
+          test('handles cursor when interaction disabled', () => {
+            controls.disableInteraction();
+
+            expect(element.style.cursor).to.be.equal('pointer');
+          });
+        });
+
+        suite('wasDragInteraction', () => {
+          setup(() => {
+            controls.applyOptions({interactionPolicy: 'always-allow'});
+            settleControls(controls);
+          });
+
+          test('wasDragInteraction false when no mousemove', () => {
+            dispatchSyntheticEvent(element, 'mousedown', {clientX: 0, clientY: 10});
+            dispatchSyntheticEvent(element, 'mouseup', {clientX: 0, clientY: 10});
+
+            expect(controls.wasDragInteraction()).to.be.false;
+          });
+
+          test('wasDragInteraction true when mousemove', () => {
+            dispatchSyntheticEvent(element, 'mousedown', {clientX: 0, clientY: 10});
+            dispatchSyntheticEvent(
+              element, 'mousemove',
+              {clientX: controls.options.minDragDistance, clientY: 10}
+            );
+            dispatchSyntheticEvent(element, 'mouseup',
+              {clientX: controls.options.minDragDistance, clientY: 10}
+            );
+
+            expect(controls.wasDragInteraction()).to.be.true;
+          });
+
+          test('not wasDragInteraction when small mousemove', () => {
+            dispatchSyntheticEvent(element, 'mousedown', {clientX: 0, clientY: 10});
+            dispatchSyntheticEvent(element, 'mousemove', {clientX: 1, clientY: 10});
+            dispatchSyntheticEvent(element, 'mouseup', {clientX: 0, clientY: 10});
+
+            expect(controls.wasDragInteraction()).to.be.false;
+          });
+
+          test('wasDragInteraction when mouseup greater than minDragDistance', () => {
+            dispatchSyntheticEvent(element, 'mousedown', {clientX: 0, clientY: 0});
+            dispatchSyntheticEvent(
+              element, 'mouseup',
+              {clientX: controls.options.minDragDistance! * 2, clientY: 0}
+            );
+
+            expect(controls.wasDragInteraction()).to.be.true;
+          });
+
+          test('wasDragInteraction when mouseup ends in the same spot', () => {
+            const touchUpAndDownPointer = {clientX: 0, clientY: 10};
+            dispatchSyntheticEvent(element, 'mousedown', touchUpAndDownPointer);
+            dispatchSyntheticEvent(
+              element, 'mousemove',
+              {clientX: 10000, clientY: 0}
+            );
+            dispatchSyntheticEvent(element, 'mouseup', touchUpAndDownPointer);
+            
+            // expect(controls.distanceMoved()).to.eql(100);
+            expect(controls.wasDragInteraction()).to.be.true;
           });
         });
 
